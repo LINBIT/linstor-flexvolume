@@ -18,7 +18,7 @@ var flexAPIs = []FlexVolumeAPI{}
 type FlexVolumeAPI interface {
 	apiVersion() string
 	// Parse and act on API calls from Kubernetes.
-	Call(string) string
+	Call(string) (string, int)
 }
 
 // NewFlexVolumeAPI tries to return the most appropreate API based on the

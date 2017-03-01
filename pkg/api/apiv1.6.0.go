@@ -45,7 +45,7 @@ func (v v160) apiVersion() string {
 	return "1.6.0"
 }
 
-func (v v160) Call(s string) string {
+func (v v160) Call(s string) (string, int) {
 	f := strings.Fields(s)
 	switch f[0] {
 	case "init":
@@ -69,59 +69,59 @@ func (v v160) Call(s string) string {
 			Status:  "Failure",
 			Message: fmt.Sprintf("Unsupported driver action: %q", f[0]),
 		})
-		return string(res)
+		return string(res), 2
 	}
 }
 
-func (v v160) init() string {
+func (v v160) init() (string, int) {
 	res, _ := json.Marshal(responce{Status: "Success"})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) attach(s []string) string {
+func (v v160) attach(s []string) (string, int) {
 	res, _ := json.Marshal(attachResponce{
 		Device: "/dev/drbd100",
 		responce: responce{
 			Status: "Success",
 		},
 	})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) waitForAttach(s []string) string {
+func (v v160) waitForAttach(s []string) (string, int) {
 	res, _ := json.Marshal(responce{Status: "Success"})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) detach(s []string) string {
+func (v v160) detach(s []string) (string, int) {
 	res, _ := json.Marshal(responce{Status: "Success"})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) mountDevice(s []string) string {
+func (v v160) mountDevice(s []string) (string, int) {
 	res, _ := json.Marshal(responce{Status: "Success"})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) unmountDevice(s []string) string {
+func (v v160) unmountDevice(s []string) (string, int) {
 	res, _ := json.Marshal(responce{Status: "Success"})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) getVolumeName(s []string) string {
+func (v v160) getVolumeName(s []string) (string, int) {
 	res, _ := json.Marshal(getVolNameResponce{
 		VolumeName: "test0",
 		responce: responce{
 			Status: "Success",
 		},
 	})
-	return string(res)
+	return string(res), 0
 }
 
-func (v v160) isAttached(s []string) string {
+func (v v160) isAttached(s []string) (string, int) {
 	res, _ := json.Marshal(isAttachedResponce{
 		Attached: "true",
 		responce: responce{Status: "Success"},
 	})
-	return string(res)
+	return string(res), 0
 }
