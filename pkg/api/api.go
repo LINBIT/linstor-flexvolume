@@ -18,13 +18,13 @@ var flexAPIs = []FlexVolumeAPI{}
 type FlexVolumeAPI interface {
 	apiVersion() string
 	// Parse and act on API calls from Kubernetes.
-	Call(string) (string, int)
+	Call([]string) (string, int)
 }
 
 // NewFlexVolumeAPI tries to return the most appropreate API based on the
 // Kubernetes server version. If the server version can't be determined, the
 // most recent API version and an error are returned.
-func NewFlexVolumeAPI(kubeVersion string) (FlexVolumeAPI, error) {
+func NewFlexVolumeAPI() (FlexVolumeAPI, error) {
 	// Sort APIs from most to least recent.
 	sort.Slice(flexAPIs, func(i, j int) bool {
 		return version.Compare(version.Normalize(flexAPIs[i].apiVersion()),

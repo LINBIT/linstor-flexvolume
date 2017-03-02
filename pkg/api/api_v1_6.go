@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 func init() {
@@ -45,29 +44,28 @@ func (v v160) apiVersion() string {
 	return "1.6.0"
 }
 
-func (v v160) Call(s string) (string, int) {
-	f := strings.Fields(s)
-	switch f[0] {
+func (v v160) Call(s []string) (string, int) {
+	switch s[0] {
 	case "init":
 		return v.init()
 	case "attach":
-		return v.attach(f)
+		return v.attach(s)
 	case "waitforattach":
-		return v.waitForAttach(f)
+		return v.waitForAttach(s)
 	case "detach":
-		return v.detach(f)
+		return v.detach(s)
 	case "mountdevice":
-		return v.mountDevice(f)
+		return v.mountDevice(s)
 	case "unmountdevice":
-		return v.unmountDevice(f)
+		return v.unmountDevice(s)
 	case "getvolumename":
-		return v.getVolumeName(f)
+		return v.getVolumeName(s)
 	case "isattached":
-		return v.isAttached(f)
+		return v.isAttached(s)
 	default:
 		res, _ := json.Marshal(responce{
 			Status:  "Failure",
-			Message: fmt.Sprintf("Unsupported driver action: %q", f[0]),
+			Message: fmt.Sprintf("Unsupported driver action: %q", s[0]),
 		})
 		return string(res), 2
 	}
