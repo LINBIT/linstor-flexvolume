@@ -45,6 +45,13 @@ func (v v160) apiVersion() string {
 }
 
 func (v v160) Call(s []string) (string, int) {
+	if len(s) > 1 {
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: "No driver action! Valid actions are: init, attach, detach, mountdevice, unmountdevice, getvolumename, isattached",
+		})
+		return string(res), 2
+	}
 	switch s[0] {
 	case "init":
 		return v.init()
