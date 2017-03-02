@@ -34,7 +34,7 @@ func NewFlexVolumeAPI() (FlexVolumeAPI, error) {
 	latestAPI := flexAPIs[0]
 	kubeVersion, err := getKubeServerVersion()
 	if err != nil {
-		return latestAPI, fmt.Errorf("defaulting to flex volume API version %q, unable to determine Kubernetes server version: %v", latestAPI.apiVersion(), err)
+		return latestAPI, fmt.Errorf("unable to determine Kubernetes server version: %v", err)
 	}
 	kubeVersion = version.Normalize(kubeVersion)
 
@@ -48,18 +48,16 @@ func NewFlexVolumeAPI() (FlexVolumeAPI, error) {
 	// No exact matches, try to return lastest API that matches major and minor revisions.
 	for _, api := range flexAPIs {
 		if strings.HasSuffix(version.Normalize(api.apiVersion()), kubeVersion[:strings.LastIndex(kubeVersion, ".")]) {
-			return api, fmt.Errorf("unable to match exact versions of flexvolume API and Kuberbetes server version (%q), proceeding with flexvolume version %q", kubeVersion, api.apiVersion())
+			return api, nil
 		}
 	}
-
-	// No minor or major version matches, at least try to match the major revision.
+	// Generate list of api versions for final error message.
+	versionList := []string{}
 	for _, api := range flexAPIs {
-		if strings.HasSuffix(version.Normalize(api.apiVersion()), kubeVersion[:strings.Index(kubeVersion, ".")]) {
-			return api, fmt.Errorf("unable to match minor versions flexvolume API to Kuberbetes server version (%q), proceeding with flexvolume version %q", kubeVersion, api.apiVersion())
-		}
+		versionList = append(versionList, api.apiVersion())
 	}
 
-	return latestAPI, fmt.Errorf("unable to match major versions flexvolume API to Kuberbetes server version (%q), trying to proceed with flexvolume version %q anyway... ", kubeVersion, latestAPI.apiVersion())
+	return latestAPI, fmt.Errorf("unable to match major and minor versions of flexvolume API and Kuberbetes server version (%q), availible flex volume APIs: %v", kubeVersion, versionList)
 }
 
 func getKubeServerVersion() (string, error) {
