@@ -19,43 +19,29 @@ package drbd
 import (
 	"fmt"
 	"os"
-	"path"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 const fieldSep = ","
 
 type DRBDUtil struct{}
 
-func (util *DRBDUtil) MakeGlobalPDName(d drbd) string {
-	return makePDNameInternal(d.plugin.host, d.ResourceName)
-}
-
-// Make a directory like /var/lib/kubelet/plugins/kubernetes.io/drbd/resource
-func makePDNameInternal(host volume.VolumeHost, resourceName string) string {
-	return path.Join(host.GetPluginDir(drbdPluginName), resourceName)
-}
-
 func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
 	d := *disk.drbd
 
-	hostName, err := getUname(d)
-	if err != nil {
-		return fmt.Errorf("DRBD: Unable to determine hostname: %v", err)
-	}
 	// Assign the resource to the Kubelet.
 	ok, err := assignRes(d)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("DRBD: Unable to assign resouce %q on node %q", d.ResourceName, hostName)
+		return fmt.Errorf("DRBD: Unable to assign resouce %q on node %q", d.ResourceName, d.NodeName)
 	}
 
 	// If we can't determine the device path, better to exit now before promotion occurs.
@@ -68,9 +54,9 @@ func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
 	// reporting than "device does not exist" on mount.
 	// Sleep here to give the resource time to establish it's disk state.
 	time.Sleep(time.Millisecond * 200)
-	out, err := d.plugin.exe.Command("drbdadm", "primary", d.ResourceName).CombinedOutput()
+	out, err := exec.Command("drbdadm", "primary", d.ResourceName).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("DRBD: Unable to make resource %q primary on node %q: %s", d.ResourceName, hostName, out)
+		return fmt.Errorf("DRBD: Unable to make resource %q primary on node %q: %s", d.ResourceName, d.NodeName, out)
 	}
 
 	// mount it
@@ -113,32 +99,27 @@ func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
 	// Client resources do not have local storage and are safe to unassign automatically.
 	if cnt <= 1 && isClient(*c.drbd) {
 
-		hostName, err := getUname(*c.drbd)
-		if err != nil {
-			return fmt.Errorf("DRBD: Unable to determine hostname for unassignment: %v", err)
-		}
-
-		glog.Infof("DRBD: Unassigning resource %q from node %q", c.ResourceName, hostName)
+		glog.Infof("DRBD: Unassigning resource %q from node %q", c.ResourceName, c.NodeName)
 		// Demote resource to allow unmounting.
-		out, err := c.plugin.exe.Command("drbdadm", "secondary", c.ResourceName).CombinedOutput()
+		out, err := exec.Command("drbdadm", "secondary", c.ResourceName).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("DRBD: failed to demote resource %q on node %q. Error: %s", c.ResourceName, hostName, out)
+			return fmt.Errorf("DRBD: failed to demote resource %q on node %q. Error: %s", c.ResourceName, c.NodeName, out)
 		}
 
 		// Unassign resource from the kubelet.
-		out, err = c.plugin.exe.Command("drbdmanage", "unassign-resource", c.ResourceName, hostName, "--quiet").CombinedOutput()
+		out, err = exec.Command("drbdmanage", "unassign-resource", c.ResourceName, c.NodeName, "--quiet").CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %s", c.ResourceName, hostName, out)
+			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %s", c.ResourceName, c.NodeName, out)
 		}
 		ok, err := waitForUnassignment(*c.drbd, 3)
 		if err != nil {
-			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %v", c.ResourceName, hostName, err)
+			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %v", c.ResourceName, c.NodeName, err)
 		}
 		if !ok {
-			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: Resource still assigned", c.ResourceName, hostName)
+			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: Resource still assigned", c.ResourceName, c.NodeName)
 		}
 
-		glog.Infof("DRBD: successfully unassigned resource %q from node %q", c.ResourceName, hostName)
+		glog.Infof("DRBD: successfully unassigned resource %q from node %q", c.ResourceName, c.NodeName)
 	}
 
 	return nil
@@ -159,7 +140,7 @@ func waitForDevPath(d drbd, maxRetries int) (string, error) {
 }
 
 func getDevPath(d drbd) (string, error) {
-	out, err := d.plugin.exe.Command("drbdmanage", "list-volumes", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-volumes", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("DRBD: Unable to get volume information: %s", out)
 	}
@@ -209,20 +190,15 @@ func assignRes(d drbd) (bool, error) {
 		return ok, err
 	}
 
-	hostName, err := getUname(d)
+	out, err := exec.Command("drbdmanage", "assign-resource", d.ResourceName, d.NodeName, "--client").CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("DRBD: Unable to determine hostname: %v", err)
-	}
-
-	out, err := d.plugin.exe.Command("drbdmanage", "assign-resource", d.ResourceName, hostName, "--client").CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", d.ResourceName, hostName, out)
+		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", d.ResourceName, d.NodeName, out)
 	}
 	return waitForAssignment(d, 5)
 }
 
 func resExists(d drbd) (bool, error) {
-	out, err := d.plugin.exe.Command("drbdmanage", "list-resources", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-resources", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, err
 	}
@@ -272,12 +248,7 @@ func waitForUnassignment(d drbd, maxRetries int) (bool, error) {
 }
 
 func resAssigned(d drbd) (bool, error) {
-	hostName, err := getUname(d)
-	if err != nil {
-		return false, fmt.Errorf("DRBD: Unable to determine hostname: %v", err)
-	}
-
-	out, err := d.plugin.exe.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", hostName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", d.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("%s", out)
 	}
@@ -306,17 +277,12 @@ func doResAssigned(assignmentInfo string) (bool, error) {
 }
 
 func retryFailedActions(d drbd) {
-	d.plugin.exe.Command("drbdmanage", "resume-all").CombinedOutput()
+	exec.Command("drbdmanage", "resume-all").CombinedOutput()
 	time.Sleep(time.Second * 2)
 }
 
 func isClient(d drbd) bool {
-	hostName, err := getUname(d)
-	if err != nil {
-		return false
-	}
-
-	out, err := d.plugin.exe.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", hostName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", d.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false
 	}
@@ -342,23 +308,13 @@ func doIsClient(assignmentInfo string) bool {
 	return true
 }
 
-// DRBD Manage node names must match the output of `uname -n`.
-func getUname(d drbd) (string, error) {
-	out, err := d.plugin.exe.Command("uname", "-n").CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(string(out)), nil
-}
-
 func getResFromDevice(d drbd, device string) (string, error) {
 	minor, err := getMinorFromDevice(device)
 	if err != nil {
 		return "", err
 	}
 
-	out, err := d.plugin.exe.Command("drbdmanage", "list-volumes", "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-volumes", "--machine-readable").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("DRBD: Unable to get volume information: %s", out)
 	}
