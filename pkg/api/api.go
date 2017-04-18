@@ -1,102 +1,124 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
-	"strings"
-
-	"github.com/mcuadros/go-version"
 )
 
-var flexAPIs = []FlexVolumeAPI{}
-
-// FlexVolumeAPI recieves flexvolume calls, performs the
-// action and returns a status message.
-type FlexVolumeAPI interface {
-	apiVersion() string
-	// Parse and act on API calls from Kubernetes.
-	Call([]string) (string, int)
+type responce struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
 
-// NewFlexVolumeAPI tries to return the most appropreate API based on the
-// Kubernetes server version. If the server version can't be determined, the
-// most recent API version and an error are returned.
-func NewFlexVolumeAPI() (FlexVolumeAPI, error) {
-	// Sort APIs from most to least recent.
-	sort.Slice(flexAPIs, func(i, j int) bool {
-		return version.Compare(version.Normalize(flexAPIs[i].apiVersion()),
-			version.Normalize(flexAPIs[j].apiVersion()),
-			">")
+type attachResponce struct {
+	responce
+	Device string `json:"device"`
+}
+
+type isAttachedResponce struct {
+	responce
+	Attached string `json:"attached"`
+}
+
+type getVolNameResponce struct {
+	responce
+	VolumeName string `json:"volumeName"`
+}
+
+type options struct {
+	FsType     string `json:"fsType"`
+	Resource   string `json:"resource"`
+	Size       string `json:"size"`
+	Site       string `json:"site"`
+	Redundancy int    `json:"redundancy"`
+}
+
+type FlexVolumeApi struct {
+}
+
+func (api FlexVolumeApi) Call(s []string) (string, int) {
+	if len(s) < 1 {
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: "No driver action! Valid actions are: init, attach, detach, mountdevice, unmountdevice, getvolumename, isattached",
+		})
+		return string(res), 2
+	}
+	switch s[0] {
+	case "init":
+		return api.init()
+	case "attach":
+		return api.attach(s)
+	case "waitforattach":
+		return api.waitForAttach(s)
+	case "detach":
+		return api.detach(s)
+	case "mountdevice":
+		return api.mountDevice(s)
+	case "unmountdevice":
+		return api.unmountDevice(s)
+	case "getvolumename":
+		return api.getVolumeName(s)
+	case "isattached":
+		return api.isAttached(s)
+	default:
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: fmt.Sprintf("Unsupported driver action: %q", s[0]),
+		})
+		return string(res), 2
+	}
+}
+
+func (api FlexVolumeApi) init() (string, int) {
+	res, _ := json.Marshal(responce{Status: "Success"})
+	return string(res), 0
+}
+
+func (api FlexVolumeApi) attach(s []string) (string, int) {
+	res, _ := json.Marshal(attachResponce{
+		Device: "/dev/drbd100",
+		responce: responce{
+			Status: "Success",
+		},
 	})
-	latestAPI := flexAPIs[0]
-	kubeVersion, err := getKubeServerVersion()
-	if err != nil {
-		return latestAPI, fmt.Errorf("unable to determine Kubernetes server version: %v", err)
-	}
-	kubeVersion = version.Normalize(kubeVersion)
-
-	// Return exact API match if we find one.
-	for _, api := range flexAPIs {
-		if version.Compare(version.Normalize(api.apiVersion()), kubeVersion, "=") {
-			return api, nil
-		}
-	}
-
-	// No exact matches, try to return lastest API that matches major and minor revisions.
-	for _, api := range flexAPIs {
-		if strings.HasSuffix(version.Normalize(api.apiVersion()), kubeVersion[:strings.LastIndex(kubeVersion, ".")]) {
-			return api, nil
-		}
-	}
-	// Generate list of api versions for final error message.
-	versionList := []string{}
-	for _, api := range flexAPIs {
-		versionList = append(versionList, api.apiVersion())
-	}
-
-	return latestAPI, fmt.Errorf("unable to match major and minor versions of flexvolume API and Kuberbetes server version (%q), availible flex volume APIs: %v", kubeVersion, versionList)
+	return string(res), 0
 }
 
-func getKubeServerVersion() (string, error) {
-	kubectl := "kubectl"
-	// See if kubectl is in the path and try to fallback to a locally running cluster if not.
-	if _, err := exec.Command("which", "kubectl").CombinedOutput(); err != nil {
-		gopath := os.Getenv("GOPATH")
-		if gopath == "" {
-			gopath = filepath.Join(os.Getenv("HOME"), "/go/")
-		}
-
-		kubectl = filepath.Join(gopath, "/src/k8s.io/kubernetes/cluster/kubectl.sh")
-		if _, err := os.Stat(kubectl); err != nil {
-			return "", fmt.Errorf("Couldn't find kubectl in path or in GOPATH")
-		}
-	}
-
-	out, err := exec.Command(kubectl, "version", "--short").CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return doGetKubeServerVersion(string(out))
+func (api FlexVolumeApi) waitForAttach(s []string) (string, int) {
+	res, _ := json.Marshal(responce{Status: "Success"})
+	return string(res), 0
 }
 
-func doGetKubeServerVersion(s string) (string, error) {
-	out := strings.Split(s, "\n")
-	if len(out) != 2 {
-		return "", fmt.Errorf("Unable to parse server version info from %v", out)
-	}
+func (api FlexVolumeApi) detach(s []string) (string, int) {
+	res, _ := json.Marshal(responce{Status: "Success"})
+	return string(res), 0
+}
 
-	serverLine := out[1]
+func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
+	res, _ := json.Marshal(responce{Status: "Success"})
+	return string(res), 0
+}
 
-	serverPrefix := "Server Version: "
+func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
+	res, _ := json.Marshal(responce{Status: "Success"})
+	return string(res), 0
+}
 
-	if ok := strings.HasPrefix(serverLine, serverPrefix); !ok {
-		return "", fmt.Errorf("Unexpected server line: %s", s)
-	}
+func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
+	res, _ := json.Marshal(getVolNameResponce{
+		VolumeName: "test0",
+		responce: responce{
+			Status: "Success",
+		},
+	})
+	return string(res), 0
+}
 
-	longVersion := strings.TrimPrefix(serverLine, serverPrefix)
-
-	return longVersion[:6], nil
+func (api FlexVolumeApi) isAttached(s []string) (string, int) {
+	res, _ := json.Marshal(isAttachedResponce{
+		Attached: "true",
+		responce: responce{Status: "Success"},
+	})
+	return string(res), 0
 }
