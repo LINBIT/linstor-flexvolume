@@ -38,7 +38,7 @@ type drbdMounter struct {
 
 const fieldSep = ","
 
-func waitForDevPath(r Resource, maxRetries int) (string, error) {
+func WaitForDevPath(r Resource, maxRetries int) (string, error) {
 	var path string
 	var err error
 
