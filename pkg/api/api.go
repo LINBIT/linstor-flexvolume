@@ -5,6 +5,14 @@ import (
 	"fmt"
 )
 
+type flexApiErr struct {
+	message string
+}
+
+func (e flexApiErr) Error() string {
+	return fmt.Sprintf("DRBD Flexvoume API: %s", e.message)
+}
+
 type responce struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
@@ -73,6 +81,24 @@ func (api FlexVolumeApi) init() (string, int) {
 }
 
 func (api FlexVolumeApi) attach(s []string) (string, int) {
+	if len(s) < 2 {
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("attach: too few arguments passed: %s", s)}.Error(),
+		})
+		return string(res), 2
+	}
+
+	opts := options{}
+	err := json.Unmarshal([]byte(s[0]), &opts)
+	if err != nil {
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("attach: couldn't parse options from %s", s[0])}.Error(),
+		})
+		return string(res), 2
+	}
+
 	res, _ := json.Marshal(attachResponce{
 		Device: "/dev/drbd100",
 		responce: responce{
