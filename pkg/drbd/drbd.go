@@ -26,10 +26,10 @@ import (
 )
 
 type Resource struct {
-	ResourceName string
-	NodeName     string
-	ReadOnly     bool
-	mounter      drbdMounter
+	Name     string
+	NodeName string
+	ReadOnly bool
+	mounter  drbdMounter
 }
 
 type drbdMounter struct {
@@ -53,7 +53,7 @@ func waitForDevPath(r Resource, maxRetries int) (string, error) {
 }
 
 func getDevPath(r Resource) (string, error) {
-	out, err := exec.Command("drbdmanage", "list-volumes", "--resources", r.ResourceName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-volumes", "--resources", r.Name, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("DRBD: Unable to get volume information: %s", out)
 	}
@@ -103,21 +103,21 @@ func AssignRes(r Resource) (bool, error) {
 		return ok, err
 	}
 
-	out, err := exec.Command("drbdmanage", "assign-resource", r.ResourceName, r.NodeName, "--client").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "assign-resource", r.Name, r.NodeName, "--client").CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", r.ResourceName, r.NodeName, out)
+		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", r.Name, r.NodeName, out)
 	}
 	return WaitForAssignment(r, 5)
 }
 
 func resExists(r Resource) (bool, error) {
-	out, err := exec.Command("drbdmanage", "list-resources", "--resources", r.ResourceName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-resources", "--resources", r.Name, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, err
 	}
 
 	// Inject real implementations here, test through the internal function.
-	return doResExists(r.ResourceName, string(out))
+	return doResExists(r.Name, string(out))
 }
 
 func doResExists(resource, resInfo string) (bool, error) {
@@ -161,7 +161,7 @@ func waitForUnassignment(r Resource, maxRetries int) (bool, error) {
 }
 
 func resAssigned(r Resource) (bool, error) {
-	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.ResourceName, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.Name, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("%s", out)
 	}
@@ -195,7 +195,7 @@ func retryFailedActions(r Resource) {
 }
 
 func isClient(r Resource) bool {
-	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.ResourceName, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.Name, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false
 	}
