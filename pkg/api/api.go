@@ -14,23 +14,23 @@ func (e flexApiErr) Error() string {
 	return fmt.Sprintf("DRBD Flexvoume API: %s", e.message)
 }
 
-type responce struct {
+type response struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
-type attachResponce struct {
-	responce
+type attachResponse struct {
+	response
 	Device string `json:"device"`
 }
 
-type isAttachedResponce struct {
-	responce
+type isAttachedResponse struct {
+	response
 	Attached string `json:"attached"`
 }
 
-type getVolNameResponce struct {
-	responce
+type getVolNameResponse struct {
+	response
 	VolumeName string `json:"volumeName"`
 }
 
@@ -44,7 +44,7 @@ type FlexVolumeApi struct {
 
 func (api FlexVolumeApi) Call(s []string) (string, int) {
 	if len(s) < 1 {
-		res, _ := json.Marshal(responce{
+		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: "No driver action! Valid actions are: init, attach, detach, mountdevice, unmountdevice, getvolumename, isattached",
 		})
@@ -68,7 +68,7 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 	case "isattached":
 		return api.isAttached(s)
 	default:
-		res, _ := json.Marshal(responce{
+		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: fmt.Sprintf("Unsupported driver action: %q", s[0]),
 		})
@@ -77,13 +77,13 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) init() (string, int) {
-	res, _ := json.Marshal(responce{Status: "Success"})
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 
 func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if len(s) < 2 {
-		res, _ := json.Marshal(responce{
+		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: flexApiErr{fmt.Sprintf("attach: too few arguments passed: %s", s)}.Error(),
 		})
@@ -93,7 +93,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	opts := options{}
 	err := json.Unmarshal([]byte(s[0]), &opts)
 	if err != nil {
-		res, _ := json.Marshal(responce{
+		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: flexApiErr{fmt.Sprintf("attach: couldn't parse options from %s", s[0])}.Error(),
 		})
@@ -104,7 +104,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 
 	_, err = drbd.AssignRes(resource)
 	if err != nil {
-		res, _ := json.Marshal(responce{
+		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: flexApiErr{fmt.Sprintf("attach: failed to assign resource %q", resource.Name)}.Error(),
 		})
@@ -113,16 +113,16 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 
 	path, err := drbd.WaitForDevPath(resource, 4)
 	if err != nil {
-		res, _ := json.Marshal(responce{
+		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: flexApiErr{fmt.Sprintf("attach: unable to find device path for resource %q", resource.Name)}.Error(),
 		})
 		return string(res), 1
 	}
 
-	res, _ := json.Marshal(attachResponce{
+	res, _ := json.Marshal(attachResponse{
 		Device: path,
-		responce: responce{
+		response: response{
 			Status: "Success",
 		},
 	})
@@ -130,29 +130,29 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) waitForAttach(s []string) (string, int) {
-	res, _ := json.Marshal(responce{Status: "Success"})
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 
 func (api FlexVolumeApi) detach(s []string) (string, int) {
-	res, _ := json.Marshal(responce{Status: "Success"})
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 
 func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
-	res, _ := json.Marshal(responce{Status: "Success"})
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 
 func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
-	res, _ := json.Marshal(responce{Status: "Success"})
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 
 func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
-	res, _ := json.Marshal(getVolNameResponce{
+	res, _ := json.Marshal(getVolNameResponse{
 		VolumeName: "test0",
-		responce: responce{
+		response: response{
 			Status: "Success",
 		},
 	})
@@ -160,9 +160,9 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) isAttached(s []string) (string, int) {
-	res, _ := json.Marshal(isAttachedResponce{
+	res, _ := json.Marshal(isAttachedResponse{
 		Attached: "true",
-		responce: responce{Status: "Success"},
+		response: response{Status: "Success"},
 	})
 	return string(res), 0
 }
