@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"linbit/drbd-flexvolume/pkg/drbd"
 )
 
 type flexApiErr struct {
@@ -99,8 +100,28 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), 2
 	}
 
+	resource := drbd.Resource{Name: opts.Resource, NodeName: s[1]}
+
+	_, err = drbd.AssignRes(resource)
+	if err != nil {
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("attach: failed to assign resource %q", resource.Name)}.Error(),
+		})
+		return string(res), 1
+	}
+
+	path, err := drbd.WaitForDevPath(resource, 4)
+	if err != nil {
+		res, _ := json.Marshal(responce{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("attach: unable to find device path for resource %q", resource.Name)}.Error(),
+		})
+		return string(res), 1
+	}
+
 	res, _ := json.Marshal(attachResponce{
-		Device: "/dev/drbd100",
+		Device: path,
 		responce: responce{
 			Status: "Success",
 		},
