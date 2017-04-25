@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 const fieldSep = ","
@@ -44,12 +43,6 @@ func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
 		return fmt.Errorf("DRBD: Unable to assign resouce %q on node %q", d.ResourceName, d.NodeName)
 	}
 
-	// If we can't determine the device path, better to exit now before promotion occurs.
-	devicePath, err := waitForDevPath(d, 10)
-	if err != nil {
-		return err
-	}
-
 	// Manually promoting is not strictly nessesary, but allows for less ambigous error
 	// reporting than "device does not exist" on mount.
 	// Sleep here to give the resource time to establish it's disk state.
@@ -58,36 +51,13 @@ func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
 	if err != nil {
 		return fmt.Errorf("DRBD: Unable to make resource %q primary on node %q: %s", d.ResourceName, d.NodeName, out)
 	}
-
-	// mount it
-	globalPDPath := d.manager.MakeGlobalPDName(d)
-	notMnt, err := d.mounter.IsLikelyNotMountPoint(globalPDPath)
-	// in the first time, the path shouldn't exist and IsLikelyNotMountPoint is expected to get NotExist
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("DRBD: %s failed to check mountpoint", globalPDPath)
-	}
-	if !notMnt {
-		return nil
-	}
-
-	if err = os.MkdirAll(globalPDPath, 0750); err != nil {
-		return fmt.Errorf("DRBD: failed to mkdir %s, error", globalPDPath)
-	}
-
-	if err = d.mounter.FormatAndMount(devicePath, globalPDPath, disk.fsType, nil); err != nil {
-		err = fmt.Errorf("DRBD: failed to mount %s [%s] to %s, error %v", devicePath, disk.fsType, globalPDPath, err)
-	}
-	return err
+	return nil
 }
 
 func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
-	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
-	if err != nil {
-		return fmt.Errorf("DRBD detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
-	}
-	if err = c.mounter.Unmount(mntPath); err != nil {
-		return fmt.Errorf("DRBD detach disk: failed to umount: %s\nError: %v", mntPath, err)
-	}
+	// Temp values
+	device := "/dev/drbd100"
+	cnt := 4
 
 	res, err := getResFromDevice(*c.drbd, device)
 	if err != nil {
