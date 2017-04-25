@@ -16,7 +16,7 @@ limitations under the License.
 
 package drbd
 
-type drbd struct {
+type Resource struct {
 	ResourceName string
 	NodeName     string
 	ReadOnly     bool
@@ -24,7 +24,7 @@ type drbd struct {
 }
 
 type drbdMounter struct {
-	*drbd
+	*Resource
 	fsType string
 }
 

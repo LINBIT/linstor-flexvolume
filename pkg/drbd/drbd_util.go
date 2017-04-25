@@ -32,7 +32,7 @@ const fieldSep = ","
 type DRBDUtil struct{}
 
 func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
-	d := *disk.drbd
+	d := *disk.Resource
 
 	// Assign the resource to the Kubelet.
 	ok, err := AssignRes(d)
@@ -59,7 +59,7 @@ func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
 	device := "/dev/drbd100"
 	cnt := 4
 
-	res, err := getResFromDevice(*c.drbd, device)
+	res, err := getResFromDevice(*c.Resource, device)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
 
 	// If device is no longer used and is assigned as a client, see if we can unassign.
 	// Client resources do not have local storage and are safe to unassign automatically.
-	if cnt <= 1 && isClient(*c.drbd) {
+	if cnt <= 1 && isClient(*c.Resource) {
 
 		glog.Infof("DRBD: Unassigning resource %q from node %q", c.ResourceName, c.NodeName)
 		// Demote resource to allow unmounting.
@@ -81,7 +81,7 @@ func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
 		if err != nil {
 			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %s", c.ResourceName, c.NodeName, out)
 		}
-		ok, err := waitForUnassignment(*c.drbd, 3)
+		ok, err := waitForUnassignment(*c.Resource, 3)
 		if err != nil {
 			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %v", c.ResourceName, c.NodeName, err)
 		}
@@ -95,7 +95,7 @@ func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
 	return nil
 }
 
-func waitForDevPath(d drbd, maxRetries int) (string, error) {
+func waitForDevPath(d Resource, maxRetries int) (string, error) {
 	var path string
 	var err error
 
@@ -109,7 +109,7 @@ func waitForDevPath(d drbd, maxRetries int) (string, error) {
 	return path, err
 }
 
-func getDevPath(d drbd) (string, error) {
+func getDevPath(d Resource) (string, error) {
 	out, err := exec.Command("drbdmanage", "list-volumes", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("DRBD: Unable to get volume information: %s", out)
@@ -149,7 +149,7 @@ func doGetDevPath(volInfo string) (string, error) {
 	return "/dev/drbd" + minor, nil
 }
 
-func AssignRes(d drbd) (bool, error) {
+func AssignRes(d Resource) (bool, error) {
 	// Make sure the resource is defined before trying to assign it.
 	if ok, err := resExists(d); err != nil || !ok {
 		return ok, err
@@ -167,7 +167,7 @@ func AssignRes(d drbd) (bool, error) {
 	return WaitForAssignment(d, 5)
 }
 
-func resExists(d drbd) (bool, error) {
+func resExists(d Resource) (bool, error) {
 	out, err := exec.Command("drbdmanage", "list-resources", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, err
@@ -189,7 +189,7 @@ func doResExists(resource, resInfo string) (bool, error) {
 }
 
 // Poll drbdmanage until resource assignment is complete.
-func WaitForAssignment(d drbd, maxRetries int) (bool, error) {
+func WaitForAssignment(d Resource, maxRetries int) (bool, error) {
 	for i := 0; i < maxRetries; i++ {
 		// If there are no errors and the resource is assigned, we can exit early.
 		if ok, err := resAssigned(d); err == nil && ok {
@@ -203,7 +203,7 @@ func WaitForAssignment(d drbd, maxRetries int) (bool, error) {
 }
 
 // Poll drbdmanage until resource unassignment is complete.
-func waitForUnassignment(d drbd, maxRetries int) (bool, error) {
+func waitForUnassignment(d Resource, maxRetries int) (bool, error) {
 	for i := 0; i < maxRetries; i++ {
 		// If there are no errors and the resource is unassigned, we can exit early.
 		if ok, err := resAssigned(d); err == nil && !ok {
@@ -217,7 +217,7 @@ func waitForUnassignment(d drbd, maxRetries int) (bool, error) {
 	return !ok, err
 }
 
-func resAssigned(d drbd) (bool, error) {
+func resAssigned(d Resource) (bool, error) {
 	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", d.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("%s", out)
@@ -246,12 +246,12 @@ func doResAssigned(assignmentInfo string) (bool, error) {
 	return true, nil
 }
 
-func retryFailedActions(d drbd) {
+func retryFailedActions(d Resource) {
 	exec.Command("drbdmanage", "resume-all").CombinedOutput()
 	time.Sleep(time.Second * 2)
 }
 
-func isClient(d drbd) bool {
+func isClient(d Resource) bool {
 	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", d.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false
@@ -278,7 +278,7 @@ func doIsClient(assignmentInfo string) bool {
 	return true
 }
 
-func getResFromDevice(d drbd, device string) (string, error) {
+func getResFromDevice(d Resource, device string) (string, error) {
 	minor, err := getMinorFromDevice(device)
 	if err != nil {
 		return "", err
