@@ -39,6 +39,16 @@ type options struct {
 	Resource string `json:"resource"`
 }
 
+func parseOptions(s string) (options, error) {
+	opts := options{}
+	err := json.Unmarshal([]byte(s), &opts)
+	if err != nil {
+		return opts, flexApiErr{fmt.Sprintf("couldn't parse options from %s", s)}
+	}
+
+	return opts, nil
+}
+
 type FlexVolumeApi struct {
 }
 
@@ -90,12 +100,11 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), 2
 	}
 
-	opts := options{}
-	err := json.Unmarshal([]byte(s[0]), &opts)
+	opts, err := parseOptions(s[0])
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("attach: couldn't parse options from %s", s[0])}.Error(),
+			Message: err.Error(),
 		})
 		return string(res), 2
 	}
@@ -158,12 +167,11 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 		return string(res), 2
 	}
 
-	opts := options{}
-	err := json.Unmarshal([]byte(s[0]), &opts)
+	opts, err := parseOptions(s[0])
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("getvolumename: couldn't parse options from %s", s[0])}.Error(),
+			Message: err.Error(),
 		})
 		return string(res), 2
 	}
