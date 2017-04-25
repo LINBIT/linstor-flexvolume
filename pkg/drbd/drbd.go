@@ -38,12 +38,12 @@ type drbdMounter struct {
 
 const fieldSep = ","
 
-func waitForDevPath(d Resource, maxRetries int) (string, error) {
+func waitForDevPath(r Resource, maxRetries int) (string, error) {
 	var path string
 	var err error
 
 	for i := 0; i < maxRetries; i++ {
-		path, err = getDevPath(d)
+		path, err = getDevPath(r)
 		if path != "" {
 			return path, err
 		}
@@ -52,8 +52,8 @@ func waitForDevPath(d Resource, maxRetries int) (string, error) {
 	return path, err
 }
 
-func getDevPath(d Resource) (string, error) {
-	out, err := exec.Command("drbdmanage", "list-volumes", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
+func getDevPath(r Resource) (string, error) {
+	out, err := exec.Command("drbdmanage", "list-volumes", "--resources", r.ResourceName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("DRBD: Unable to get volume information: %s", out)
 	}
@@ -92,32 +92,32 @@ func doGetDevPath(volInfo string) (string, error) {
 	return "/dev/drbd" + minor, nil
 }
 
-func AssignRes(d Resource) (bool, error) {
+func AssignRes(r Resource) (bool, error) {
 	// Make sure the resource is defined before trying to assign it.
-	if ok, err := resExists(d); err != nil || !ok {
+	if ok, err := resExists(r); err != nil || !ok {
 		return ok, err
 	}
 
 	// If the resource is already assigned, we're done.
-	if ok, err := resAssigned(d); err != nil || ok {
+	if ok, err := resAssigned(r); err != nil || ok {
 		return ok, err
 	}
 
-	out, err := exec.Command("drbdmanage", "assign-resource", d.ResourceName, d.NodeName, "--client").CombinedOutput()
+	out, err := exec.Command("drbdmanage", "assign-resource", r.ResourceName, r.NodeName, "--client").CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", d.ResourceName, d.NodeName, out)
+		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", r.ResourceName, r.NodeName, out)
 	}
-	return WaitForAssignment(d, 5)
+	return WaitForAssignment(r, 5)
 }
 
-func resExists(d Resource) (bool, error) {
-	out, err := exec.Command("drbdmanage", "list-resources", "--resources", d.ResourceName, "--machine-readable").CombinedOutput()
+func resExists(r Resource) (bool, error) {
+	out, err := exec.Command("drbdmanage", "list-resources", "--resources", r.ResourceName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, err
 	}
 
 	// Inject real implementations here, test through the internal function.
-	return doResExists(d.ResourceName, string(out))
+	return doResExists(r.ResourceName, string(out))
 }
 
 func doResExists(resource, resInfo string) (bool, error) {
@@ -132,36 +132,36 @@ func doResExists(resource, resInfo string) (bool, error) {
 }
 
 // Poll drbdmanage until resource assignment is complete.
-func WaitForAssignment(d Resource, maxRetries int) (bool, error) {
+func WaitForAssignment(r Resource, maxRetries int) (bool, error) {
 	for i := 0; i < maxRetries; i++ {
 		// If there are no errors and the resource is assigned, we can exit early.
-		if ok, err := resAssigned(d); err == nil && ok {
+		if ok, err := resAssigned(r); err == nil && ok {
 			return ok, nil
 		}
 		// See if we can recover from any errors or complete pending state changes.
-		retryFailedActions(d)
+		retryFailedActions(r)
 	}
 	// Return any errors that might have prevented resource assignment.
-	return resAssigned(d)
+	return resAssigned(r)
 }
 
 // Poll drbdmanage until resource unassignment is complete.
-func waitForUnassignment(d Resource, maxRetries int) (bool, error) {
+func waitForUnassignment(r Resource, maxRetries int) (bool, error) {
 	for i := 0; i < maxRetries; i++ {
 		// If there are no errors and the resource is unassigned, we can exit early.
-		if ok, err := resAssigned(d); err == nil && !ok {
+		if ok, err := resAssigned(r); err == nil && !ok {
 			return !ok, nil
 		}
 		// See if we can recover from any errors or complete pending state changes.
-		retryFailedActions(d)
+		retryFailedActions(r)
 	}
 	// Return any errors that might have prevented resource unassignment.
-	ok, err := resAssigned(d)
+	ok, err := resAssigned(r)
 	return !ok, err
 }
 
-func resAssigned(d Resource) (bool, error) {
-	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", d.NodeName, "--machine-readable").CombinedOutput()
+func resAssigned(r Resource) (bool, error) {
+	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.ResourceName, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("%s", out)
 	}
@@ -189,13 +189,13 @@ func doResAssigned(assignmentInfo string) (bool, error) {
 	return true, nil
 }
 
-func retryFailedActions(d Resource) {
+func retryFailedActions(r Resource) {
 	exec.Command("drbdmanage", "resume-all").CombinedOutput()
 	time.Sleep(time.Second * 2)
 }
 
-func isClient(d Resource) bool {
-	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", d.ResourceName, "--nodes", d.NodeName, "--machine-readable").CombinedOutput()
+func isClient(r Resource) bool {
+	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.ResourceName, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false
 	}
@@ -221,7 +221,7 @@ func doIsClient(assignmentInfo string) bool {
 	return true
 }
 
-func getResFromDevice(d Resource, device string) (string, error) {
+func getResFromDevice(r Resource, device string) (string, error) {
 	minor, err := getMinorFromDevice(device)
 	if err != nil {
 		return "", err
