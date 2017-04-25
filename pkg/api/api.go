@@ -26,11 +26,8 @@ type getVolNameResponce struct {
 }
 
 type options struct {
-	FsType     string `json:"fsType"`
-	Resource   string `json:"resource"`
-	Size       string `json:"size"`
-	Site       string `json:"site"`
-	Redundancy int    `json:"redundancy"`
+	FsType   string `json:"fsType"`
+	Resource string `json:"resource"`
 }
 
 type FlexVolumeApi struct {
