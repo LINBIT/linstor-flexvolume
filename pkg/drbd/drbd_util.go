@@ -35,7 +35,7 @@ func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
 	d := *disk.drbd
 
 	// Assign the resource to the Kubelet.
-	ok, err := assignRes(d)
+	ok, err := AssignRes(d)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func doGetDevPath(volInfo string) (string, error) {
 	return "/dev/drbd" + minor, nil
 }
 
-func assignRes(d drbd) (bool, error) {
+func AssignRes(d drbd) (bool, error) {
 	// Make sure the resource is defined before trying to assign it.
 	if ok, err := resExists(d); err != nil || !ok {
 		return ok, err
@@ -164,7 +164,7 @@ func assignRes(d drbd) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("DRBD: Unable to assign resource %q on node %q: %s", d.ResourceName, d.NodeName, out)
 	}
-	return waitForAssignment(d, 5)
+	return WaitForAssignment(d, 5)
 }
 
 func resExists(d drbd) (bool, error) {
@@ -189,7 +189,7 @@ func doResExists(resource, resInfo string) (bool, error) {
 }
 
 // Poll drbdmanage until resource assignment is complete.
-func waitForAssignment(d drbd, maxRetries int) (bool, error) {
+func WaitForAssignment(d drbd, maxRetries int) (bool, error) {
 	for i := 0; i < maxRetries; i++ {
 		// If there are no errors and the resource is assigned, we can exit early.
 		if ok, err := resAssigned(d); err == nil && ok {
