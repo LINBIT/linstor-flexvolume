@@ -150,8 +150,26 @@ func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
+	if len(s) < 1 {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("getvolumename: too few arguments passed: %s", s)}.Error(),
+		})
+		return string(res), 2
+	}
+
+	opts := options{}
+	err := json.Unmarshal([]byte(s[0]), &opts)
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("getvolumename: couldn't parse options from %s", s[0])}.Error(),
+		})
+		return string(res), 2
+	}
+
 	res, _ := json.Marshal(getVolNameResponse{
-		VolumeName: "test0",
+		VolumeName: opts.Resource,
 		response: response{
 			Status: "Success",
 		},
