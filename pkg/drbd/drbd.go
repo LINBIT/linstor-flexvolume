@@ -23,8 +23,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/golang/glog"
 )
 
 type Resource struct {
@@ -35,81 +33,10 @@ type Resource struct {
 }
 
 type drbdMounter struct {
-	*Resource
 	fsType string
 }
 
-type drbdUnmounter struct {
-	*drbdMounter
-}
-
 const fieldSep = ","
-
-type DRBDUtil struct{}
-
-func (util *DRBDUtil) AttachDisk(disk drbdMounter) error {
-	d := *disk.Resource
-
-	// Assign the resource to the Kubelet.
-	ok, err := AssignRes(d)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("DRBD: Unable to assign resouce %q on node %q", d.ResourceName, d.NodeName)
-	}
-
-	// Manually promoting is not strictly nessesary, but allows for less ambigous error
-	// reporting than "device does not exist" on mount.
-	// Sleep here to give the resource time to establish it's disk state.
-	time.Sleep(time.Millisecond * 200)
-	out, err := exec.Command("drbdadm", "primary", d.ResourceName).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("DRBD: Unable to make resource %q primary on node %q: %s", d.ResourceName, d.NodeName, out)
-	}
-	return nil
-}
-
-func (util *DRBDUtil) DetachDisk(c drbdUnmounter, mntPath string) error {
-	// Temp values
-	device := "/dev/drbd100"
-	cnt := 4
-
-	res, err := getResFromDevice(*c.Resource, device)
-	if err != nil {
-		return err
-	}
-	c.ResourceName = res
-
-	// If device is no longer used and is assigned as a client, see if we can unassign.
-	// Client resources do not have local storage and are safe to unassign automatically.
-	if cnt <= 1 && isClient(*c.Resource) {
-
-		glog.Infof("DRBD: Unassigning resource %q from node %q", c.ResourceName, c.NodeName)
-		// Demote resource to allow unmounting.
-		out, err := exec.Command("drbdadm", "secondary", c.ResourceName).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("DRBD: failed to demote resource %q on node %q. Error: %s", c.ResourceName, c.NodeName, out)
-		}
-
-		// Unassign resource from the kubelet.
-		out, err = exec.Command("drbdmanage", "unassign-resource", c.ResourceName, c.NodeName, "--quiet").CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %s", c.ResourceName, c.NodeName, out)
-		}
-		ok, err := waitForUnassignment(*c.Resource, 3)
-		if err != nil {
-			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %v", c.ResourceName, c.NodeName, err)
-		}
-		if !ok {
-			return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: Resource still assigned", c.ResourceName, c.NodeName)
-		}
-
-		glog.Infof("DRBD: successfully unassigned resource %q from node %q", c.ResourceName, c.NodeName)
-	}
-
-	return nil
-}
 
 func waitForDevPath(d Resource, maxRetries int) (string, error) {
 	var path string
