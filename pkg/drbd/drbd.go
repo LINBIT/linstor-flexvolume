@@ -110,6 +110,21 @@ func AssignRes(r Resource) (bool, error) {
 	return WaitForAssignment(r, 5)
 }
 
+func UnassignRes(r Resource) error {
+	out, err := exec.Command("drbdmanage", "unassign-resource", r.Name, r.NodeName, "--quiet").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %s", r.Name, r.NodeName, out)
+	}
+	ok, err := waitForUnassignment(r, 3)
+	if err != nil {
+		return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: %v", r.Name, r.NodeName, err)
+	}
+	if !ok {
+		return fmt.Errorf("DRBD: failed to unassign resource %q from node %q. Error: Resource still assigned", r.Name, r.NodeName)
+	}
+	return nil
+}
+
 func resExists(r Resource) (bool, error) {
 	out, err := exec.Command("drbdmanage", "list-resources", "--resources", r.Name, "--machine-readable").CombinedOutput()
 	if err != nil {
