@@ -144,6 +144,34 @@ func (api FlexVolumeApi) waitForAttach(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) detach(s []string) (string, int) {
+	if len(s) < 2 {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexApiErr{fmt.Sprintf("detach: too few arguments passed: %s", s)}.Error(),
+		})
+		return string(res), 2
+	}
+
+	opts, err := parseOptions(s[0])
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: err.Error(),
+		})
+		return string(res), 2
+	}
+
+	resource := drbd.Resource{Name: opts.Resource, NodeName: s[1]}
+
+	err = drbd.UnassignRes(resource)
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: err.Error(),
+		})
+		return string(res), 2
+	}
+
 	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
