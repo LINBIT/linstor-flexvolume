@@ -215,6 +215,42 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) isAttached(s []string) (string, int) {
+	if len(s) < 2 {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("detach: too few arguments passed: %s", s)}.Error(),
+		})
+		return string(res), 2
+	}
+
+	opts, err := parseOptions(s[0])
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: err.Error(),
+		})
+		return string(res), 2
+	}
+
+	resource := drbd.Resource{Name: opts.Resource, NodeName: s[1]}
+
+	ok, err := drbd.WaitForAssignment(resource, 4)
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: err.Error(),
+		})
+		return string(res), 2
+	}
+
+	if !ok {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("resource %q not attached", resource.Name)}.Error(),
+		})
+		return string(res), 2
+	}
+
 	res, _ := json.Marshal(isAttachedResponse{
 		Attached: "true",
 		response: response{Status: "Success"},
