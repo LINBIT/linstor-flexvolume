@@ -6,11 +6,11 @@ import (
 	"linbit/drbd-flexvolume/pkg/drbd"
 )
 
-type flexApiErr struct {
+type flexAPIErr struct {
 	message string
 }
 
-func (e flexApiErr) Error() string {
+func (e flexAPIErr) Error() string {
 	return fmt.Sprintf("DRBD Flexvoume API: %s", e.message)
 }
 
@@ -44,7 +44,7 @@ func parseOptions(s string) (options, error) {
 	opts := options{}
 	err := json.Unmarshal([]byte(s), &opts)
 	if err != nil {
-		return opts, flexApiErr{fmt.Sprintf("couldn't parse options from %s", s)}
+		return opts, flexAPIErr{fmt.Sprintf("couldn't parse options from %s", s)}
 	}
 
 	return opts, nil
@@ -96,7 +96,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if len(s) < 2 {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("attach: too few arguments passed: %s", s)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("attach: too few arguments passed: %s", s)}.Error(),
 		})
 		return string(res), 2
 	}
@@ -116,7 +116,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("attach: failed to assign resource %q", resource.Name)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("attach: failed to assign resource %q", resource.Name)}.Error(),
 		})
 		return string(res), 1
 	}
@@ -125,7 +125,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("attach: unable to find device path for resource %q", resource.Name)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("attach: unable to find device path for resource %q", resource.Name)}.Error(),
 		})
 		return string(res), 1
 	}
@@ -148,7 +148,7 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 	if len(s) < 2 {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("detach: too few arguments passed: %s", s)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("detach: too few arguments passed: %s", s)}.Error(),
 		})
 		return string(res), 2
 	}
@@ -191,7 +191,7 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 	if len(s) < 1 {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexApiErr{fmt.Sprintf("getvolumename: too few arguments passed: %s", s)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("getvolumename: too few arguments passed: %s", s)}.Error(),
 		})
 		return string(res), 2
 	}
