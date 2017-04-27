@@ -218,7 +218,7 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 	if len(s) < 2 {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("detach: too few arguments passed: %s", s)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("isattached: too few arguments passed: %s", s)}.Error(),
 		})
 		return string(res), 2
 	}
