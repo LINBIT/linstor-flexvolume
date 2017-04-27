@@ -15,7 +15,7 @@ RM_FLAGS = -rvf
 
 .PHONY: make_directories
 
-all: make_directories
+all: make_directories build
 
 make_directories:
 	$(MKDIR) $(MKDIR_FLAGS) $(DIRECTORIES)  
