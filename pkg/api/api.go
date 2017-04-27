@@ -35,8 +35,9 @@ type getVolNameResponse struct {
 }
 
 type options struct {
-	FsType   string `json:"fsType"`
-	Resource string `json:"resource"`
+	FsType    string `json:"kubernetes.io/fsType"`
+	Readwrite string `json:"kubernetes.io/readwrite"`
+	Resource  string `json:"resource"`
 }
 
 func parseOptions(s string) (options, error) {
