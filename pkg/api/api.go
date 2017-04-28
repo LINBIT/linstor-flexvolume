@@ -74,6 +74,10 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 		return api.mountDevice(s)
 	case "unmountdevice":
 		return api.unmountDevice(s)
+	case "mount":
+		return api.mount(s)
+	case "unmount":
+		return api.unmount(s)
 	case "getvolumename":
 		return api.getVolumeName(s)
 	case "isattached":
@@ -169,12 +173,34 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
-	res, _ := json.Marshal(response{Status: "Success"})
+	res, _ := json.Marshal(response{
+		Status:  "Failure",
+		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
+	})
 	return string(res), 0
 }
 
 func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
-	res, _ := json.Marshal(response{Status: "Success"})
+	res, _ := json.Marshal(response{
+		Status:  "Failure",
+		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
+	})
+	return string(res), 0
+}
+
+func (api FlexVolumeApi) mount(s []string) (string, int) {
+	res, _ := json.Marshal(response{
+		Status:  "Failure",
+		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
+	})
+	return string(res), 0
+}
+
+func (api FlexVolumeApi) unmount(s []string) (string, int) {
+	res, _ := json.Marshal(response{
+		Status:  "Failure",
+		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
+	})
 	return string(res), 0
 }
 
