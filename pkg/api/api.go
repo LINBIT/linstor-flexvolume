@@ -153,18 +153,9 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 		return string(res), 2
 	}
 
-	opts, err := parseOptions(s[1])
-	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: err.Error(),
-		})
-		return string(res), 2
-	}
+	resource := drbd.Resource{Name: s[1], NodeName: s[2]}
 
-	resource := drbd.Resource{Name: opts.Resource, NodeName: s[2]}
-
-	err = drbd.UnassignRes(resource)
+	err := drbd.UnassignRes(resource)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
