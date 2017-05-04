@@ -173,10 +173,39 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
-	res, _ := json.Marshal(response{
-		Status:  "Failure",
-		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
-	})
+	if len(s) < 4 {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("mountDevice: too few arguments passed: %s", s)}.Error(),
+		})
+		return string(res), 2
+	}
+
+	opts, err := parseOptions(s[3])
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: err.Error(),
+		})
+		return string(res), 2
+	}
+
+	mounter := drbd.Mounter{
+		Resource: &drbd.Resource{
+			Name: opts.Resource},
+		FSType: opts.FsType,
+	}
+
+	err = mounter.Mount(s[1])
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("mountDevice: %q", err)}.Error(),
+		})
+		return string(res), 2
+	}
+
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 
@@ -190,7 +219,7 @@ func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
 
 func (api FlexVolumeApi) mount(s []string) (string, int) {
 	res, _ := json.Marshal(response{
-		Status:  "Failure",
+		Status:  "Not supported",
 		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
 	})
 	return string(res), 0
@@ -198,7 +227,7 @@ func (api FlexVolumeApi) mount(s []string) (string, int) {
 
 func (api FlexVolumeApi) unmount(s []string) (string, int) {
 	res, _ := json.Marshal(response{
-		Status:  "Failure",
+		Status:  "Not Supported",
 		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
 	})
 	return string(res), 0

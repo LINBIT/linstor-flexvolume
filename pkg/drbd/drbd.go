@@ -31,12 +31,12 @@ type Resource struct {
 	ReadOnly bool
 }
 
-type drbdMounter struct {
+type Mounter struct {
 	*Resource
-	fsType string
+	FSType string
 }
 
-func (m drbdMounter) Mount(path string) error {
+func (m Mounter) Mount(path string) error {
 	device, err := WaitForDevPath(*m.Resource, 3)
 	if err != nil {
 		return fmt.Errorf("unable to mount device, couldn't find Resource device path: %v", err)
@@ -60,7 +60,7 @@ func (m drbdMounter) Mount(path string) error {
 	return nil
 }
 
-func (m drbdMounter) UnMount(path string) error {
+func (m Mounter) UnMount(path string) error {
 	// If the path isn't a directory, we're not mounted there.
 	_, err := exec.Command("test", "-d", path).CombinedOutput()
 	if err != nil {
@@ -86,24 +86,24 @@ func (m drbdMounter) UnMount(path string) error {
 	return nil
 }
 
-func (m drbdMounter) safeFormat(path string) error {
+func (m Mounter) safeFormat(path string) error {
 	deviceFS, err := checkFSType(path)
 	if err != nil {
 		return fmt.Errorf("unable to format filesystem for %q: %v", path, err)
 	}
 
 	// Device is formatted correctly already.
-	if deviceFS == m.fsType {
+	if deviceFS == m.FSType {
 		return nil
 	}
 
-	if deviceFS != "" && deviceFS != m.fsType {
-		return fmt.Errorf("device %q already formatted with %q filesystem, refusing to overwrite with %q filesystem", path, deviceFS, m.fsType)
+	if deviceFS != "" && deviceFS != m.FSType {
+		return fmt.Errorf("device %q already formatted with %q filesystem, refusing to overwrite with %q filesystem", path, deviceFS, m.FSType)
 	}
 
-	out, err := exec.Command("mkfs", "-t", m.fsType).CombinedOutput()
+	out, err := exec.Command("mkfs", "-t", m.FSType).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%v: %q", err, out)
+		return fmt.Errorf("couldn't create %s filesystem %v: %q", m.FSType, err, out)
 	}
 
 	return nil
@@ -353,10 +353,10 @@ func getResFromVolumes(volumes, minor string) (string, error) {
 }
 
 func checkFSType(dev string) (string, error) {
-	out, err := exec.Command("blkid", dev).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("%v: %s", err, out)
-	}
+	// If there's no filesystem, then we'll have a nonzero exit code, but no output
+	// doCheckFSType handles this case.
+	out, _ := exec.Command("blkid", "-o", "udev", dev).CombinedOutput()
+
 	FSType, err := doCheckFSType(string(out))
 	if err != nil {
 		return "", err
