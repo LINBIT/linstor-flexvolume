@@ -36,6 +36,30 @@ type drbdMounter struct {
 	fsType string
 }
 
+func (m drbdMounter) Mount(path string) error {
+	device, err := WaitForDevPath(*m.Resource, 3)
+	if err != nil {
+		return fmt.Errorf("unable to mount device, couldn't find Resource device path: %v", err)
+	}
+
+	err = m.safeFormat(device)
+	if err != nil {
+		return fmt.Errorf("unable to mount device: %v", err)
+	}
+
+	out, err := exec.Command("mkdir", "-p", path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("unable to mount device, failed to make mount directory: %v: %s", err, out)
+	}
+
+	out, err = exec.Command("mount", device, path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("unable to mount device: %v: %s", err, out)
+	}
+
+	return nil
+}
+
 func (m drbdMounter) safeFormat(path string) error {
 	deviceFS, err := checkFSType(path)
 	if err != nil {
