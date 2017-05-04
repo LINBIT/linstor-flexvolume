@@ -60,6 +60,32 @@ func (m drbdMounter) Mount(path string) error {
 	return nil
 }
 
+func (m drbdMounter) UnMount(path string) error {
+	// If the path isn't a directory, we're not mounted there.
+	_, err := exec.Command("test", "-d", path).CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	// If the path isn't mounted, then we're not mounted.
+	_, err = exec.Command("findmnt", "-f", path).CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	device, err := WaitForDevPath(*m.Resource, 3)
+	if err != nil {
+		return fmt.Errorf("unable to unmount device, couldn't find Resource device path: %v", err)
+	}
+
+	out, err := exec.Command("umount", device, path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("unable to unmount device: %q: %s", err, out)
+	}
+
+	return nil
+}
+
 func (m drbdMounter) safeFormat(path string) error {
 	deviceFS, err := checkFSType(path)
 	if err != nil {
