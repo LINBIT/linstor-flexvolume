@@ -29,11 +29,34 @@ type Resource struct {
 	Name     string
 	NodeName string
 	ReadOnly bool
-	mounter  drbdMounter
 }
 
 type drbdMounter struct {
+	*Resource
 	fsType string
+}
+
+func (m drbdMounter) safeFormat(path string) error {
+	deviceFS, err := checkFSType(path)
+	if err != nil {
+		return fmt.Errorf("unable to format filesystem for %q: %v", path, err)
+	}
+
+	// Device is formatted correctly already.
+	if deviceFS == m.fsType {
+		return nil
+	}
+
+	if deviceFS != "" && deviceFS != m.fsType {
+		return fmt.Errorf("device %q already formatted with %q filesystem, refusing to overwrite with %q filesystem", path, deviceFS, m.fsType)
+	}
+
+	out, err := exec.Command("mkfs", "-t", m.fsType).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %q", err, out)
+	}
+
+	return nil
 }
 
 const fieldSep = ","
