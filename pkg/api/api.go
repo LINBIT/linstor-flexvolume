@@ -210,11 +210,7 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
-	res, _ := json.Marshal(response{
-		Status:  "Failure",
-		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
-	})
-	return string(res), 0
+	return api.unmount(s)
 }
 
 func (api FlexVolumeApi) mount(s []string) (string, int) {
@@ -226,10 +222,24 @@ func (api FlexVolumeApi) mount(s []string) (string, int) {
 }
 
 func (api FlexVolumeApi) unmount(s []string) (string, int) {
-	res, _ := json.Marshal(response{
-		Status:  "Not Supported",
-		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
-	})
+	if len(s) < 2 {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("mountDevice: too few arguments passed: %s", s)}.Error(),
+		})
+		return string(res), 2
+	}
+	umounter := drbd.Mounter{}
+
+	err := umounter.UnMount(s[1])
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("unmount: %v", err)}.Error(),
+		})
+		return string(res), 1
+	}
+	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), 0
 }
 

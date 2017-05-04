@@ -73,12 +73,7 @@ func (m Mounter) UnMount(path string) error {
 		return nil
 	}
 
-	device, err := WaitForDevPath(*m.Resource, 3)
-	if err != nil {
-		return fmt.Errorf("unable to unmount device, couldn't find Resource device path: %v", err)
-	}
-
-	out, err := exec.Command("umount", device, path).CombinedOutput()
+	out, err := exec.Command("umount", path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("unable to unmount device: %q: %s", err, out)
 	}
