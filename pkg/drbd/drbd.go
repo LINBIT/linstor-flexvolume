@@ -101,7 +101,7 @@ func (m Mounter) safeFormat(path string) error {
 		return fmt.Errorf("device %q already formatted with %q filesystem, refusing to overwrite with %q filesystem", path, deviceFS, m.FSType)
 	}
 
-	out, err := exec.Command("mkfs", "-t", m.FSType).CombinedOutput()
+	out, err := exec.Command("mkfs", "-t", m.FSType, path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("couldn't create %s filesystem %v: %q", m.FSType, err, out)
 	}
