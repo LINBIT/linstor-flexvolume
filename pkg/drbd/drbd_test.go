@@ -131,3 +131,21 @@ func TestGetResFromVolumes(t *testing.T) {
 		}
 	}
 }
+
+func TestDoCheckFSType(t *testing.T) {
+	var blkidOutputStringTests = []struct {
+		in  string
+		out string
+	}{
+		{"ID_FS_UUID=15336bdb-4584-4c30-9719-754f5c4744e1\nID_FS_UUID_ENC=15336bdb-4584-4c30-9719-754f5c4744e1\nID_FS_TYPE=ext4\n", "ext4"},
+		{"ID_FS_UUID=15336bdb-4584-4c30-9719-754f5c4744e1\nID_FS_UUID_ENC=15336bdb-4584-4c30-9719-754f5c4744e1\nID_FS_TYPE=xfs\n", "xfs"},
+		{"\n", ""},
+	}
+
+	for _, tt := range blkidOutputStringTests {
+		FSType, _ := doCheckFSType(tt.in)
+		if FSType != tt.out {
+			t.Errorf("Called: doCheckFSType(%q), Expected: %q, Got: %q", tt.in, tt.out, FSType)
+		}
+	}
+}

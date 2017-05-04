@@ -278,3 +278,41 @@ func getResFromVolumes(volumes, minor string) (string, error) {
 	}
 	return "", nil
 }
+
+func checkFSType(dev string) (string, error) {
+	out, err := exec.Command("blkid", dev).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%v: %s", err, out)
+	}
+	FSType, err := doCheckFSType(string(out))
+	if err != nil {
+		return "", err
+	}
+	return FSType, nil
+}
+
+// Parse the filesystem from the output of `blkid -o udev`
+func doCheckFSType(s string) (string, error) {
+	f := strings.Fields(s)
+
+	// blkid returns an empty string if there's no filesystem and so do we.
+	if len(f) == 0 {
+		return "", nil
+	}
+
+	blockAttrs := make(map[string]string)
+	for _, pair := range f {
+		p := strings.Split(pair, "=")
+		if len(p) < 2 {
+			return "", fmt.Errorf("couldn't parse filesystem data from %s", s)
+		}
+		blockAttrs[p[0]] = p[1]
+	}
+
+	FSKey := "ID_FS_TYPE"
+	fs, ok := blockAttrs[FSKey]
+	if !ok {
+		return "", fmt.Errorf("couldn't find %s in %s", FSKey, blockAttrs)
+	}
+	return fs, nil
+}
