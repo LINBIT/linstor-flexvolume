@@ -1,0 +1,21 @@
+metadata:
+  name: fedora
+spec:
+  containers:
+  - name: fedora
+    image: fedora
+    command: [/bin/bash]
+    args: ["-c", "while true; do sleep 10; done"]
+    volumeMounts:
+    - name: test
+      mountPath: /data
+    ports:
+    - containerPort: 80
+  volumes:
+  - name: test
+    flexVolume:
+      driver: "linbit/drbd"
+      fsType: "ext4"
+      options:
+        resource: "r0"
+
