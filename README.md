@@ -1,6 +1,6 @@
-#DRBD flexvolume plugin for Kubernetes
+# DRBD flexvolume plugin for Kubernetes
 
-##Building
+## Building
 
 Requires Go 1.8 or higher and a configured GOPATH
 
@@ -17,14 +17,14 @@ Requires Go 1.8 or higher and a configured GOPATH
 This will compile a binary targeting the local machine's architecture and
 place it into the `_build` directory.
 
-##Installing
+## Installing
 
 Place the generated binary named `drbd` under the following path on the kubelet and
 kube-controller-manager nodes: 
 
 /usr/libexec/kubernetes/kubelet-plugins/volume/exec/linbit~drbd/
 
-##Usage
+## Usage
 
 Resources must be created before attachment with DRBD Manage before they are
 available for Kubernetes.
