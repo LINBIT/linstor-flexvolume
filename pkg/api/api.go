@@ -116,11 +116,7 @@ func (api FlexVolumeApi) init() (string, int) {
 
 func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if len(s) < 3 {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("attach: too few arguments passed: %s", s)}.Error(),
-		})
-		return string(res), 2
+		return tooFewArgsResponse(s)
 	}
 
 	opts, err := parseOptions(s[1])
@@ -168,11 +164,7 @@ func (api FlexVolumeApi) waitForAttach(s []string) (string, int) {
 
 func (api FlexVolumeApi) detach(s []string) (string, int) {
 	if len(s) < 3 {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("detach: too few arguments passed: %s", s)}.Error(),
-		})
-		return string(res), 2
+		return tooFewArgsResponse(s)
 	}
 
 	resource := drbd.Resource{Name: s[1], NodeName: s[2]}
@@ -192,11 +184,7 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 
 func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 	if len(s) < 4 {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("mountDevice: too few arguments passed: %s", s)}.Error(),
-		})
-		return string(res), 2
+		return tooFewArgsResponse(s)
 	}
 
 	opts, err := parseOptions(s[3])
@@ -241,11 +229,7 @@ func (api FlexVolumeApi) mount(s []string) (string, int) {
 
 func (api FlexVolumeApi) unmount(s []string) (string, int) {
 	if len(s) < 2 {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("mountDevice: too few arguments passed: %s", s)}.Error(),
-		})
-		return string(res), 2
+		return tooFewArgsResponse(s)
 	}
 	umounter := drbd.Mounter{}
 
@@ -263,11 +247,7 @@ func (api FlexVolumeApi) unmount(s []string) (string, int) {
 
 func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 	if len(s) < 2 {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("getvolumename: too few arguments passed: %s", s)}.Error(),
-		})
-		return string(res), 2
+		return tooFewArgsResponse(s)
 	}
 
 	opts, err := parseOptions(s[1])
@@ -290,11 +270,7 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 
 func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 	if len(s) < 3 {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("isattached: too few arguments passed: %s", s)}.Error(),
-		})
-		return string(res), 2
+		return tooFewArgsResponse(s)
 	}
 
 	opts, err := parseOptions(s[1])
@@ -330,4 +306,12 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 		response: response{Status: "Success"},
 	})
 	return string(res), 0
+}
+
+func tooFewArgsResponse(s []string) (string, int) {
+	res, _ := json.Marshal(response{
+		Status:  "Failure",
+		Message: flexAPIErr{fmt.Sprintf("%s: too few arguments passed: %s", s[0], s)}.Error(),
+	})
+	return string(res), 2
 }
