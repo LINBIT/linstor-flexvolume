@@ -92,8 +92,6 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 		return api.mountDevice(s)
 	case "unmountdevice":
 		return api.unmountDevice(s)
-	case "mount":
-		return api.mount(s)
 	case "unmount":
 		return api.unmount(s)
 	case "getvolumename":
@@ -102,7 +100,7 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 		return api.isAttached(s)
 	default:
 		res, _ := json.Marshal(response{
-			Status:  "Failure",
+			Status:  "Not supported",
 			Message: fmt.Sprintf("Unsupported driver action: %q", s[0]),
 		})
 		return string(res), 2
@@ -217,14 +215,6 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 
 func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
 	return api.unmount(s)
-}
-
-func (api FlexVolumeApi) mount(s []string) (string, int) {
-	res, _ := json.Marshal(response{
-		Status:  "Not supported",
-		Message: flexAPIErr{fmt.Sprintf("not supported")}.Error(),
-	})
-	return string(res), 0
 }
 
 func (api FlexVolumeApi) unmount(s []string) (string, int) {
