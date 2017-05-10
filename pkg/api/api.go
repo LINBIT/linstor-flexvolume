@@ -21,7 +21,8 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"linbit/drbd-flexvolume/pkg/drbd"
+
+	"github.com/linbit/drbd-flexvolume/pkg/drbd"
 )
 
 // API status codes, used as exit codes in main.

@@ -2,11 +2,11 @@ DRBD flexvolume plugin for Kubernetes
 
 Building
 
-Requires Go 1.8 or higher
+Requires Go 1.8 or higher and a configured GOPATH
 
-`mkdir $GOPATH/linbit`
+`mkdir -p $GOPATH/src/github.com/`
 
-`cd $GOPATH/linbit`
+`cd $GOPATH/src/github.com/`
 
 `git clone git@drbd.org:drbd-flexvolume.git`
 

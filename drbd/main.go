@@ -20,10 +20,11 @@ package main
 
 import (
 	"fmt"
-	"linbit/drbd-flexvolume/pkg/api"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/linbit/drbd-flexvolume/pkg/api"
 )
 
 // Version is set via ldflags configued in the Makefile.
