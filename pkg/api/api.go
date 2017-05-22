@@ -107,7 +107,7 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 	default:
 		res, _ := json.Marshal(response{
 			Status:  "Not supported",
-			Message: fmt.Sprintf("Unsupported driver action: %q", s[0]),
+			Message: fmt.Sprintf("Unsupported driver action: %s", s[0]),
 		})
 		return string(res), EXITBADAPICALL
 	}
@@ -138,7 +138,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("attach: failed to assign resource %q", resource.Name)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("attach: failed to assign resource %s", resource.Name)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
@@ -147,7 +147,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("attach: unable to find device path for resource %q", resource.Name)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("attach: unable to find device path for resource %s", resource.Name)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
@@ -210,7 +210,7 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("mountDevice: %q", err)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("mountDevice: %v", err)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
@@ -292,7 +292,7 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 	if !ok {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("resource %q not attached", resource.Name)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("resource %s not attached", resource.Name)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
