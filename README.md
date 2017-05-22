@@ -40,3 +40,7 @@ this may be overridden via the kubelet `--hostname-override` parameter
 `example.yaml`, located in the root of this project, contains an example
 configuration that attaches a resource named `r0` to the container under the path
 `/data`
+
+Please note that the physical volume name and the resource name associated
+**must** match in order for the volume to be detached from the kublet due to
+https://github.com/kubernetes/kubernetes/issues/44737

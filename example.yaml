@@ -7,12 +7,12 @@ spec:
     command: [/bin/bash]
     args: ["-c", "while true; do sleep 10; done"]
     volumeMounts:
-    - name: test
+    - name: r0
       mountPath: /data
     ports:
     - containerPort: 80
   volumes:
-  - name: test
+  - name: r0
     flexVolume:
       driver: "linbit/drbd"
       fsType: "ext4"

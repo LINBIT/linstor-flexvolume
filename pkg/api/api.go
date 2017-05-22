@@ -83,7 +83,7 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 	if len(s) < 1 {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: "No driver action! Valid actions are: init, attach, detach, mountdevice, unmountdevice, getvolumename, isattached",
+			Message: "No driver action! Valid actions are: init, attach, detach, mountdevice, unmountdevice, isattached",
 		})
 		return string(res), EXITBADAPICALL
 	}
@@ -102,8 +102,6 @@ func (api FlexVolumeApi) Call(s []string) (string, int) {
 		return api.unmountDevice(s)
 	case "unmount":
 		return api.unmount(s)
-	case "getvolumename":
-		return api.getVolumeName(s)
 	case "isattached":
 		return api.isAttached(s)
 	default:
