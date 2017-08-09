@@ -8,9 +8,11 @@ Requires Go 1.8 or higher and a configured GOPATH
 
 `cd $GOPATH/src/github.com/`
 
-`git clone git@drbd.org:drbd-flexvolume.git`
+`git clone https://github.com/LINBIT/drbd-flexvolume`
 
 `cd drbd-flexvolume`
+
+`go get ./...`
 
 `make`
 
@@ -25,6 +27,9 @@ kube-controller-manager nodes:
 /usr/libexec/kubernetes/kubelet-plugins/volume/exec/linbit~drbd/
 
 ## Usage
+After installation, manual installation on every node and restart of kubelet on
+every node & controller-manager on the master node is required:
+https://github.com/kubernetes/kubernetes/issues/32550
 
 Resources must be created before attachment with DRBD Manage before they are
 available for Kubernetes.
