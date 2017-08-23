@@ -248,7 +248,7 @@ func waitForUnassignment(r Resource, maxRetries int) (bool, error) {
 func resAssigned(r Resource) (bool, error) {
 	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.Name, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("%s", out)
+		return false, fmt.Errorf("%s: %v", out, err)
 	}
 	return doResAssigned(string(out))
 }

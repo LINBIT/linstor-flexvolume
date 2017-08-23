@@ -21,6 +21,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/syslog"
 	"os"
 	"strings"
 
@@ -31,23 +32,28 @@ import (
 var Version string
 
 func main() {
-	api := api.FlexVolumeApi{}
+
+	apiCall := os.Args[1]
 
 	// Print version and exit.
-	if os.Args[1] == "--version" {
+	if apiCall == "--version" {
 		fmt.Println(Version)
 		os.Exit(0)
 	}
 
-	f, err := os.OpenFile("/tmp/drbdflex.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	sysLog, err := syslog.New(syslog.LOG_INFO, "DRBD FlexVolume")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
-	f.WriteString("called with: " + strings.Join(os.Args[1:], ", ") + "\n")
+	log.SetOutput(sysLog)
+
+	log.Printf("called with %s: %s", apiCall, strings.Join(os.Args[2:], ", "))
+
+	api := api.FlexVolumeApi{}
 
 	out, ret := api.Call(os.Args[1:])
-	f.WriteString("responded: " + out + "\n\n")
+
+	log.Printf("responded to %s: %s", os.Args[1], out)
 
 	fmt.Print(out)
 	os.Exit(ret)

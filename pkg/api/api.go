@@ -76,8 +76,7 @@ func parseOptions(s string) (options, error) {
 	return opts, nil
 }
 
-type FlexVolumeApi struct {
-}
+type FlexVolumeApi struct{}
 
 func (api FlexVolumeApi) Call(s []string) (string, int) {
 	if len(s) < 1 {
