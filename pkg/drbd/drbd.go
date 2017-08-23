@@ -279,7 +279,7 @@ func retryFailedActions(r Resource) {
 	time.Sleep(time.Second * 2)
 }
 
-func isClient(r Resource) bool {
+func IsClient(r Resource) bool {
 	out, err := exec.Command("drbdmanage", "list-assignments", "--resources", r.Name, "--nodes", r.NodeName, "--machine-readable").CombinedOutput()
 	if err != nil {
 		return false

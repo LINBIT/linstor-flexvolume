@@ -172,6 +172,12 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 
 	resource := drbd.Resource{Name: s[1], NodeName: s[2]}
 
+	// Do not unassign resources that have local storage.
+	if !drbd.IsClient(resource) {
+		res, _ := json.Marshal(response{Status: "Success"})
+		return string(res), EXITSUCCESS
+	}
+
 	err := drbd.UnassignRes(resource)
 	if err != nil {
 		res, _ := json.Marshal(response{
