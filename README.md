@@ -4,11 +4,11 @@
 
 Requires Go 1.8 or higher and a configured GOPATH
 
-`mkdir -p $GOPATH/src/github.com/`
+`mkdir -p $GOPATH/src/github.com/linbit/`
 
-`cd $GOPATH/src/github.com/`
+`cd $GOPATH/src/github.com/linbit/`
 
-`git clone https://github.com/LINBIT/drbd-flexvolume`
+`git clone https://github.com/linbit/drbd-flexvolume`
 
 `cd drbd-flexvolume`
 
