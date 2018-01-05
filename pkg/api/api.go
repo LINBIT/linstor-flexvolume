@@ -61,9 +61,17 @@ type getVolNameResponse struct {
 }
 
 type options struct {
-	FsType    string `json:"kubernetes.io/fsType"`
-	Readwrite string `json:"kubernetes.io/readwrite"`
-	Resource  string `json:"resource"`
+	FsType      string `json:"kubernetes.io/fsType"`
+	Readwrite   string `json:"kubernetes.io/readwrite"`
+	Resource    string `json:"resource"`
+	PVCResource string `json:"kubernetes.io/pvOrVolumeName"`
+}
+
+func (o *options) getResource() string {
+	if o.Resource != "" {
+		return o.Resource
+	}
+	return o.PVCResource
 }
 
 func parseOptions(s string) (options, error) {
@@ -131,7 +139,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := drbd.Resource{Name: opts.Resource, NodeName: s[2]}
+	resource := drbd.Resource{Name: opts.getResource(), NodeName: s[2]}
 
 	_, err = drbd.AssignRes(resource)
 	if err != nil {
@@ -207,7 +215,7 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 
 	mounter := drbd.Mounter{
 		Resource: &drbd.Resource{
-			Name: opts.Resource},
+			Name: opts.getResource()},
 		FSType: opts.FsType,
 	}
 
@@ -261,7 +269,7 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 	}
 
 	res, _ := json.Marshal(getVolNameResponse{
-		VolumeName: opts.Resource,
+		VolumeName: opts.getResource(),
 		response: response{
 			Status: "Success",
 		},
@@ -283,7 +291,7 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := drbd.Resource{Name: opts.Resource, NodeName: s[2]}
+	resource := drbd.Resource{Name: opts.getResource(), NodeName: s[2]}
 
 	ok, err := drbd.WaitForAssignment(resource, 4)
 	if err != nil {
