@@ -10,15 +10,15 @@ spec:
     command: [/bin/bash]
     args: ["-c", "while true; do sleep 10; done"]
     volumeMounts:
-    - name: r0
+    - name: r00
       mountPath: /data
     ports:
     - containerPort: 80
   volumes:
-  - name: r0
+  - name: r00
     flexVolume:
-      driver: "linbit/drbd"
+      driver: "linbit/linstor-flexvolume"
       fsType: "ext4"
       options:
-        resource: "r0"
+        resource: "r00"
 

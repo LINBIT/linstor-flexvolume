@@ -1,6 +1,6 @@
 /*
-* DRBD Flexvolume plugin for Kubernetes.
-* Copyright © 2017 LINBIT USA LLC
+* Linstor Flexvolume plugin for Kubernetes.
+* Copyright © 2018 LINBIT USA LLC
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/linbit/drbd-flexvolume/pkg/api"
+	"github.com/linbit/linstor-flexvolume/pkg/api"
 )
 
 // Version is set via ldflags configued in the Makefile.
@@ -41,7 +41,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	sysLog, err := syslog.New(syslog.LOG_INFO, "DRBD FlexVolume")
+	sysLog, err := syslog.New(syslog.LOG_INFO, "Linstor FlexVolume")
 	if err != nil {
 		log.Fatal(err)
 	}

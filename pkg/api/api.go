@@ -1,6 +1,6 @@
 /*
-* DRBD Flexvolume plugin for Kubernetes.
-* Copyright © 2017 LINBIT USA LLC
+* Linstor Flexvolume plugin for Kubernetes.
+* Copyright © 2018 LINBIT USA LLC
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/linbit/drbd-flexvolume/pkg/drbd"
+	linstor "github.com/linbit/golinstor"
 )
 
 // API status codes, used as exit codes in main.
@@ -37,7 +37,7 @@ type flexAPIErr struct {
 }
 
 func (e flexAPIErr) Error() string {
-	return fmt.Sprintf("DRBD Flexvoume API: %s", e.message)
+	return fmt.Sprintf("Linstor Flexvoume API: %s", e.message)
 }
 
 type response struct {
@@ -139,9 +139,9 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := drbd.Resource{Name: opts.getResource(), NodeName: s[2]}
+	resource := linstor.Resource{Name: opts.getResource(), ClientList: []string{s[2]}}
 
-	_, err = drbd.AssignRes(resource)
+	err = resource.Assign()
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
@@ -150,7 +150,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITDRBDFAILURE
 	}
 
-	path, err := drbd.WaitForDevPath(resource, 4)
+	path, err := linstor.WaitForDevPath(resource, 4)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
@@ -178,15 +178,15 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 		return tooFewArgsResponse(s)
 	}
 
-	resource := drbd.Resource{Name: s[1], NodeName: s[2]}
+	resource := linstor.Resource{Name: s[1]}
 
 	// Do not unassign resources that have local storage.
-	if !drbd.IsClient(resource) {
+	if !resource.IsClient(s[2]) {
 		res, _ := json.Marshal(response{Status: "Success"})
 		return string(res), EXITSUCCESS
 	}
 
-	err := drbd.UnassignRes(resource)
+	err := resource.Unassign(s[2])
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
@@ -213,8 +213,8 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	mounter := drbd.Mounter{
-		Resource: &drbd.Resource{
+	mounter := linstor.FSUtil{
+		Resource: &linstor.Resource{
 			Name: opts.getResource()},
 		FSType: opts.FsType,
 	}
@@ -240,7 +240,7 @@ func (api FlexVolumeApi) unmount(s []string) (string, int) {
 	if len(s) < 2 {
 		return tooFewArgsResponse(s)
 	}
-	umounter := drbd.Mounter{}
+	umounter := linstor.FSUtil{}
 
 	err := umounter.UnMount(s[1])
 	if err != nil {
@@ -291,21 +291,13 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := drbd.Resource{Name: opts.getResource(), NodeName: s[2]}
+	resource := linstor.Resource{Name: opts.getResource(), ClientList: []string{s[2]}}
 
-	ok, err := drbd.WaitForAssignment(resource, 4)
+	err = resource.Assign()
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
-	}
-
-	if !ok {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: resource %s not attached", s[0], resource.Name)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
