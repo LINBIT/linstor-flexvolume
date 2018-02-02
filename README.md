@@ -8,9 +8,9 @@ Requires Go 1.8 or higher and a configured GOPATH
 
 `cd $GOPATH/src/github.com/linbit/`
 
-`git clone https://github.com/linbit/drbd-flexvolume`
+`git clone https://github.com/linbit/linstor-flexvolume`
 
-`cd drbd-flexvolume`
+`cd linstor-flexvolume`
 
 `go get ./...`
 
@@ -52,5 +52,5 @@ name **must** match exactly in order for the volume to remain attached to the
 kubelet due to https://github.com/kubernetes/kubernetes/issues/44737
 
 `example.yaml`, located in the root of this project, contains an example
-configuration that attaches a resource named `r00` to the container under the path
-`/data`. Note that that the PV name is also named `r00`.
+configuration that attaches a resource named `r0` to the container under the path
+`/data`. Note that that the PV name is also named `r0`.
