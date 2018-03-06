@@ -150,7 +150,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITDRBDFAILURE
 	}
 
-	path, err := linstor.WaitForDevPath(resource, 4)
+	path, err := linstor.WaitForDevPath(resource, 30)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
