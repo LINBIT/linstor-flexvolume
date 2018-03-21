@@ -21,6 +21,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	linstor "github.com/linbit/golinstor"
 )
@@ -64,6 +65,7 @@ type options struct {
 	FsType      string `json:"kubernetes.io/fsType"`
 	Readwrite   string `json:"kubernetes.io/readwrite"`
 	Resource    string `json:"resource"`
+	BlockSize   string `json:"blockSize"`
 	PVCResource string `json:"kubernetes.io/pvOrVolumeName"`
 }
 
@@ -79,6 +81,11 @@ func parseOptions(s string) (options, error) {
 	err := json.Unmarshal([]byte(s), &opts)
 	if err != nil {
 		return opts, flexAPIErr{fmt.Sprintf("couldn't parse options from %s", s)}
+	}
+
+	// BlockSizes of zero are ignored by FSUtil
+	if opts.BlockSize == "" {
+		opts.BlockSize = "0"
 	}
 
 	return opts, nil
@@ -213,10 +220,20 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
+	bSize, err := strconv.ParseInt(opts.BlockSize, 10, 32)
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
+		})
+		return string(res), EXITDRBDFAILURE
+	}
+
 	mounter := linstor.FSUtil{
 		Resource: &linstor.Resource{
 			Name: opts.getResource()},
-		FSType: opts.FsType,
+		FSType:    opts.FsType,
+		BlockSize: bSize,
 	}
 
 	err = mounter.Mount(s[1])

@@ -1,10 +1,12 @@
 PROJECT_NAME = `basename $$PWD`
 VERSION=`git describe --tags --always --dirty`
+OS=linux
+ARCH=amd64
+
 MAGIC_DIR = /usr/libexec/kubernetes/kubelet-plugins/volume/exec/linbit~${PROJECT_NAME}
 
 GO = go
 LDFLAGS = -ldflags "-X main.Version=${VERSION}"
-BUILD_CMD = build $(LDFLAGS) 
 
 MKDIR = mkdir
 MKDIR_FLAGS = -pv
@@ -17,8 +19,14 @@ RM_FLAGS = -vf
 
 all: build
 
-build:
-	$(GO) $(BUILD_CMD)
+get:
+	-go get ./... &> /dev/null
+
+build: get
+	$(GO) build $(LDFLAGS)
+
+release: get
+	GOOS=$(OS) GOARCH=$(ARCH) $(GO) build $(LDFLAGS) -o $(PROJECT_NAME)-$(OS)-$(ARCH)
 
 install:
 	$(MKDIR) $(MKDIR_FLAGS) $(MAGIC_DIR)
@@ -26,3 +34,6 @@ install:
 
 clean:
 	$(RM) $(RM_FLAGS) $(PROJECT_NAME)
+
+distclean: clean
+	$(RM) $(RM_FLAGS) $(PROJECT_NAME)-$(OS)-$(ARCH)

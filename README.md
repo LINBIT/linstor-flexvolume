@@ -12,8 +12,6 @@ Requires Go 1.8 or higher and a configured GOPATH
 
 `cd linstor-flexvolume`
 
-`go get ./...`
-
 `make`
 
 This will compile a binary targeting the local machine's architecture and

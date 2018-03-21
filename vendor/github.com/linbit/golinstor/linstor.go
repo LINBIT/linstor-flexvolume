@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,13 +32,15 @@ import (
 // a resource. If you're deploying a resource, Redundancy is required. If you're
 // assigning a resource to a particular node, NodeName is required.
 type Resource struct {
-	Name        string
-	NodeName    string
-	Redundancy  string
-	NodeList    []string
-	ClientList  []string
-	StoragePool string
-	SizeKiB     uint64
+	Name                string
+	NodeName            string
+	Redundancy          string
+	NodeList            []string
+	ClientList          []string
+	AutoPlace           string
+	DoNotPlaceWithRegex string
+	SizeKiB             uint64
+	StoragePool         string
 }
 
 type resList []struct {
@@ -132,12 +135,8 @@ func (s returnStatuses) validate() error {
 }
 
 func linstorSuccess(retcode uint64) bool {
-	const (
-		maskError = 0xC000000000000000
-		maskWarn  = 0x8000000000000000
-		maskInfo  = 0x4000000000000000
-	)
-	return (retcode & (maskError | maskWarn | maskInfo)) == 0
+	const maskError = 0xC000000000000000 // includes warnings and info (i.e., everything != SUCCESS)
+	return (retcode & maskError) == 0
 }
 
 // CreateAndAssign deploys the resource, created a new one if it doesn't exist.
@@ -145,11 +144,7 @@ func (r Resource) CreateAndAssign() error {
 	if err := r.Create(); err != nil {
 		return err
 	}
-	if err := r.Assign(); err != nil {
-		return err
-	}
-
-	return nil
+	return r.Assign()
 }
 
 // Only use this for things that return the normal returnStatuses json.
@@ -160,41 +155,22 @@ func linstor(args ...string) error {
 		return fmt.Errorf("%v : %s", err, out)
 	}
 
+	if !json.Valid(out) {
+		return fmt.Errorf("not a valid json input: %s", out)
+	}
 	s := returnStatuses{}
 	if err := json.Unmarshal(out, &s); err != nil {
 		return fmt.Errorf("couldn't Unmarshal %s :%v", out, err)
 	}
 
-	if err := s.validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return s.validate()
 }
 
 // Create reserves the resource name in Linstor.
 func (r Resource) Create() error {
-	out, err := exec.Command("linstor", "-m", "list-resource-definition").CombinedOutput()
+	defPresent, volZeroPresent, err := r.checkDefined()
 	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-	s := resDefInfo{}
-	if err := json.Unmarshal(out, &s); err != nil {
-		return fmt.Errorf("couldn't Unmarshal %s :%v", out, err)
-	}
-
-	var defPresent bool
-	var volZeroPresent bool
-
-	for _, def := range s[0].RscDfns {
-		if def.RscName == r.Name {
-			defPresent = true
-			for _, vol := range def.VlmDfns {
-				if vol.VlmNr == 0 {
-					volZeroPresent = true
-				}
-			}
-		}
+		return err
 	}
 
 	if !defPresent {
@@ -210,6 +186,38 @@ func (r Resource) Create() error {
 	}
 
 	return nil
+}
+
+func (r Resource) checkDefined() (bool, bool, error) {
+	out, err := exec.Command("linstor", "-m", "list-resource-definitions").CombinedOutput()
+	if err != nil {
+		return false, false, fmt.Errorf("%v: %s", err, out)
+	}
+
+	if !json.Valid(out) {
+		return false, false, fmt.Errorf("not a valid json input: %s", out)
+	}
+	s := resDefInfo{}
+	if err := json.Unmarshal(out, &s); err != nil {
+		return false, false, fmt.Errorf("couldn't Unmarshal %s :%v", out, err)
+	}
+
+	var defPresent, volZeroPresent bool
+
+	for _, def := range s[0].RscDfns {
+		if def.RscName == r.Name {
+			defPresent = true
+			for _, vol := range def.VlmDfns {
+				if vol.VlmNr == 0 {
+					volZeroPresent = true
+					break
+				}
+			}
+			break
+		}
+	}
+
+	return defPresent, volZeroPresent, nil
 }
 
 // Assign assigns a resource with diskfull storage to all nodes in its NodeList,
@@ -248,6 +256,17 @@ func (r Resource) Assign() error {
 		}
 	}
 
+	if r.AutoPlace != "" {
+		args := []string{"create-resource", r.Name, "--auto-place", r.AutoPlace}
+		if r.DoNotPlaceWithRegex != "" {
+			args = append(args, "--do-not-place-with-regex", r.DoNotPlaceWithRegex)
+		}
+
+		if err := linstor(args...); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -261,6 +280,17 @@ func (r Resource) Unassign(nodeName string) error {
 
 // Delete removes a resource entirely from all nodes.
 func (r Resource) Delete() error {
+	defPresent, _, err := r.checkDefined()
+	if err != nil {
+		return fmt.Errorf("failed to delete resource %s: %v", r.Name, err)
+	}
+
+	// If the resource definition doesn't exist, then the resource is as deleted
+	// as we can possibly make it.
+	if !defPresent {
+		return nil
+	}
+
 	if err := linstor("delete-resource-definition", r.Name); err != nil {
 		return fmt.Errorf("failed to delete resource %s: %v", r.Name, err)
 	}
@@ -269,7 +299,7 @@ func (r Resource) Delete() error {
 
 // Exists checks to see if a resource is defined in DRBD Manage.
 func (r Resource) Exists() (bool, error) {
-	out, err := exec.Command("linstor", "-m", "ls-rsc").CombinedOutput()
+	out, err := exec.Command("linstor", "-m", "list-resources").CombinedOutput()
 	if err != nil {
 		return false, err
 	}
@@ -281,6 +311,9 @@ func (r Resource) Exists() (bool, error) {
 func doResExists(resourceName string, resInfo []byte) (bool, error) {
 	resources := resList{}
 
+	if !json.Valid(resInfo) {
+		return false, fmt.Errorf("not a valid json input: %s", resInfo)
+	}
 	err := json.Unmarshal(resInfo, &resources)
 	if err != nil {
 		return false, fmt.Errorf("couldn't Unmarshal %s :%v", resInfo, err)
@@ -297,11 +330,14 @@ func doResExists(resourceName string, resInfo []byte) (bool, error) {
 
 //OnNode determines if a resource is present on a particular node.
 func (r Resource) OnNode(nodeName string) (bool, error) {
-	out, err := exec.Command("linstor", "-m", "ls-rsc").CombinedOutput()
+	out, err := exec.Command("linstor", "-m", "list-resources").CombinedOutput()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%v: %s", err, out)
 	}
 
+	if !json.Valid(out) {
+		return false, fmt.Errorf("not a valid json input: %s", out)
+	}
 	l := resList{}
 	if err := json.Unmarshal(out, &l); err != nil {
 		return false, fmt.Errorf("couldn't Unmarshal %s :%v", out, err)
@@ -321,8 +357,11 @@ func doResOnNode(list resList, resName, nodeName string) bool {
 
 // IsClient determines if resource is running as a client on nodeName.
 func (r Resource) IsClient(nodeName string) bool {
-	out, _ := exec.Command("linstor", "-m", "ls-rsc").CombinedOutput()
+	out, _ := exec.Command("linstor", "-m", "list-resources").CombinedOutput()
 
+	if !json.Valid(out) {
+		return false
+	}
 	list := resList{}
 	if err := json.Unmarshal(out, &list); err != nil {
 		return false
@@ -355,7 +394,9 @@ func EnoughFreeSpace(requestedKiB, replicas string) error {
 // FSUtil handles creating a filesystem and mounting resources.
 type FSUtil struct {
 	*Resource
-	FSType string
+	FSType    string
+	BlockSize int64
+	args      []string
 }
 
 // Mount the FSUtil's resource on the path.
@@ -420,9 +461,30 @@ func (f FSUtil) safeFormat(path string) error {
 		return fmt.Errorf("device %q already formatted with %q filesystem, refusing to overwrite with %q filesystem", path, deviceFS, f.FSType)
 	}
 
-	out, err := exec.Command("mkfs", "-t", f.FSType, path).CombinedOutput()
+	f.populateArgs()
+
+	args := []string{"-t", f.FSType}
+	args = append(args, f.args...)
+	args = append(args, path)
+
+	out, err := exec.Command("mkfs", args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("couldn't create %s filesystem %v: %q", f.FSType, err, out)
+	}
+
+	return nil
+}
+
+func (f *FSUtil) populateArgs() error {
+
+	if f.BlockSize != 0 {
+		b := strconv.FormatInt(f.BlockSize, 10)
+
+		if f.FSType == "xfs" {
+			b = fmt.Sprintf("size=%s", b)
+		}
+
+		f.args = []string{"-b", b}
 	}
 
 	return nil
@@ -482,11 +544,14 @@ func WaitForDevPath(r Resource, maxRetries int) (string, error) {
 }
 
 func getDevPath(r Resource) (string, error) {
-	out, err := exec.Command("linstor", "-m", "ls-rsc").CombinedOutput()
+	out, err := exec.Command("linstor", "-m", "list-resources").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
 
+	if !json.Valid(out) {
+		return "", fmt.Errorf("not a valid json input: %s", out)
+	}
 	list := resList{}
 	if err := json.Unmarshal(out, &list); err != nil {
 		return "", err
