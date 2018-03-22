@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strconv"
 
-	linstor "github.com/linbit/golinstor"
+	linstor "github.com/LINBIT/golinstor"
 )
 
 // API status codes, used as exit codes in main.

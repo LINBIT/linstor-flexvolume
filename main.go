@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/linbit/linstor-flexvolume/pkg/api"
+	"github.com/LINBIT/linstor-flexvolume/pkg/api"
 )
 
 // Version is set via ldflags configued in the Makefile.
