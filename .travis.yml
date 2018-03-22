@@ -1,3 +1,13 @@
 language: go
 go:
 - tip
+before_deploy: "make release"
+deploy:
+  provider: releases
+  api_key:
+    secure: OJVFGhHIr9lWnBvN4IOIWk5lxwCj8xMezpgH5NPjKGWPNPdQQM4ONhfEswEnD9gNtyStNh2POOQEbaimpDIPby/dX8DXF6FJ2Isfyu/kabbZAKz8sdoUlSyT/lt+4gx5IBxrWP14yLMPVF+hhvVdXiXKLYnFSKyONy/HK7qvnwhftwbArzQn0yKlPpTysER9T1fqSAK5g1CQ8Yz1FGu678Fu/XsGm6WumD4tP4w/bf10feINJBQiAbCs/9lc9FkTHt/tQzMfy/X5vKPHaX5kF+LI1iYq95I32CSRLyOFwMlV/9cs3Zz62vHbjbDWPobxHhO8HXh3D5vBDYCq7ofkgtWEgDkktsZ9sDGnP2mYbXwbzcRPhR51S1sopWo+ScRYtuNIyftV60ieQQb9JxZx2JuzWTooFJ2VtdmoaNtUTBILt61Y8bs8FYpJI5HI5NhAMX5G3Cu2jP+ExsKmeVQr6uFeDDZXQOrxpVNEfwAqRC5dFTkCl1ASE5eo4QkIbzy9ZB0AGlnAX7EC7fLnN+I4mccsfVOpUY2qTYOPyAovpS8Uanio40tuDSFkifJQEbA2Ev3siI4OWbPAAJlKTpfbpfwBfsSxtF3YmP6DvjRF6XP15q24tt/z8aIg+vWs+NefEJItxiuZ32uiMoAejzGwK+tTStbh8UluRqcyTn9Yxjw=
+  file: linstor-flexvolume-linux-amd64
+  skip_cleanup: true
+  on:
+    repo: LINBIT/linstor-flexvolume
+    tags: true
