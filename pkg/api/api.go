@@ -62,11 +62,18 @@ type getVolNameResponse struct {
 }
 
 type options struct {
+	// K8s volume options.
 	FsType      string `json:"kubernetes.io/fsType"`
 	Readwrite   string `json:"kubernetes.io/readwrite"`
-	Resource    string `json:"resource"`
-	BlockSize   string `json:"blockSize"`
 	PVCResource string `json:"kubernetes.io/pvOrVolumeName"`
+
+	// Homegrown volume options.
+	Resource  string `json:"resource"`
+	BlockSize string `json:"blockSize"`
+	Force     string `json:"force"`
+	XFSDataSU string `json:"xfsDataSu"`
+	XFSDataSW string `json:"xfsDataSw"`
+	XFSLogDev string `json:"xfsLogDev"`
 }
 
 func (o *options) getResource() string {
@@ -86,6 +93,14 @@ func parseOptions(s string) (options, error) {
 	// BlockSizes of zero are ignored by FSUtil
 	if opts.BlockSize == "" {
 		opts.BlockSize = "0"
+	}
+
+	if opts.XFSDataSW == "" {
+		opts.XFSDataSW = "0"
+	}
+
+	if opts.Force == "" {
+		opts.Force = "false"
 	}
 
 	return opts, nil
@@ -229,11 +244,32 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		return string(res), EXITDRBDFAILURE
 	}
 
+	XFSDataSW, err := strconv.ParseInt(opts.XFSDataSW, 10, 32)
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
+		})
+		return string(res), EXITDRBDFAILURE
+	}
+
+	force, err := strconv.ParseBool(opts.Force)
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
+		})
+		return string(res), EXITDRBDFAILURE
+	}
+
 	mounter := linstor.FSUtil{
-		Resource: &linstor.Resource{
-			Name: opts.getResource()},
+		Resource:  &linstor.Resource{Name: opts.getResource()},
 		FSType:    opts.FsType,
 		BlockSize: bSize,
+		Force:     force,
+		XFSDataSU: opts.XFSDataSU,
+		XFSDataSW: int(XFSDataSW),
+		XFSLogDev: opts.XFSLogDev,
 	}
 
 	err = mounter.Mount(s[1])

@@ -18,7 +18,12 @@ spec:
   - name: r0
     flexVolume:
       driver: "linbit/linstor-flexvolume"
-      fsType: "ext4"
+      fsType: "xfs"
       options:
         resource: "r0"
+        blockSize: "4096"
+        force: "true"
+        xfsDataSu: "128k"
+        xfsDataSw: "1"
+        xfsLogDev: "/tmp/example"
 

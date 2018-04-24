@@ -1,6 +1,6 @@
-hash: fc70e2dbf5cdbb9aa87ec25837f72d63381ac48a420f7a589c75e220811fb15d
-updated: 2018-03-22T11:49:01.181835842+01:00
+hash: 9b7d3f98e8baba4b747db3296acf791af4780b1a5cb4d3459599b57c015c0d8e
+updated: 2018-04-24T15:39:00.228697549-07:00
 imports:
 - name: github.com/LINBIT/golinstor
-  version: 519b2add375781396512d551e75a9dfca8c56c64
+  version: 6089de7adc356194a321a33fba77dd0315a6f99d
 testImports: []
