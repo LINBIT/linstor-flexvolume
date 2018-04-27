@@ -53,7 +53,7 @@ type attachResponse struct {
 
 type isAttachedResponse struct {
 	response
-	Attached string `json:"attached"`
+	Attached bool `json:"attached"`
 }
 
 type getVolNameResponse struct {
@@ -68,12 +68,13 @@ type options struct {
 	PVCResource string `json:"kubernetes.io/pvOrVolumeName"`
 
 	// Homegrown volume options.
-	Resource  string `json:"resource"`
-	BlockSize string `json:"blockSize"`
-	Force     string `json:"force"`
-	XFSDataSU string `json:"xfsDataSu"`
-	XFSDataSW string `json:"xfsDataSw"`
-	XFSLogDev string `json:"xfsLogDev"`
+	Resource            string `json:"resource"`
+	BlockSize           string `json:"blockSize"`
+	Force               string `json:"force"`
+	XFSDataSU           string `json:"xfsDataSu"`
+	XFSDataSW           string `json:"xfsDataSw"`
+	XFSLogDev           string `json:"xfsLogDev"`
+	DisklessStoragePool string `json:"disklessStoragePool"`
 }
 
 func (o *options) getResource() string {
@@ -161,7 +162,11 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := linstor.Resource{Name: opts.getResource(), ClientList: []string{s[2]}}
+	resource := linstor.Resource{
+		Name:                opts.getResource(),
+		ClientList:          []string{s[2]},
+		DisklessStoragePool: opts.DisklessStoragePool,
+	}
 
 	err = resource.Assign()
 	if err != nil {
@@ -172,7 +177,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITDRBDFAILURE
 	}
 
-	path, err := linstor.WaitForDevPath(resource, 30)
+	path, err := linstor.GetDevPath(resource, false)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
@@ -356,7 +361,7 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 	}
 
 	res, _ := json.Marshal(isAttachedResponse{
-		Attached: "true",
+		Attached: true,
 		response: response{Status: "Success"},
 	})
 	return string(res), EXITSUCCESS
