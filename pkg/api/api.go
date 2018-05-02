@@ -349,9 +349,9 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := linstor.Resource{Name: opts.getResource(), ClientList: []string{s[2]}}
+	resource := linstor.Resource{Name: opts.getResource()}
 
-	err = resource.Assign()
+	ok, err := resource.OnNode(s[2])
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
@@ -360,10 +360,19 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 		return string(res), EXITDRBDFAILURE
 	}
 
+	if !ok {
+		res, _ := json.Marshal(isAttachedResponse{
+			Attached: ok,
+			response: response{Status: "Failure"},
+		})
+		return string(res), EXITSUCCESS
+	}
+
 	res, _ := json.Marshal(isAttachedResponse{
-		Attached: true,
+		Attached: ok,
 		response: response{Status: "Success"},
 	})
+
 	return string(res), EXITSUCCESS
 }
 
