@@ -75,6 +75,11 @@ type options struct {
 	XFSDataSW           string `json:"xfsDataSw"`
 	XFSLogDev           string `json:"xfsLogDev"`
 	DisklessStoragePool string `json:"disklessStoragePool"`
+
+	// Parsed option ready to pass to linstor.FSUtil
+	xfsDataSW int
+	blockSize int64
+	force     bool
 }
 
 func (o *options) getResource() string {
@@ -95,13 +100,26 @@ func parseOptions(s string) (options, error) {
 	if opts.BlockSize == "" {
 		opts.BlockSize = "0"
 	}
+	opts.blockSize, err = strconv.ParseInt(opts.BlockSize, 10, 32)
+	if err != nil {
+		return opts, err
+	}
 
 	if opts.XFSDataSW == "" {
 		opts.XFSDataSW = "0"
 	}
+	xfsdatasw, err := strconv.ParseInt(opts.XFSDataSW, 10, 32)
+	if err != nil {
+		return opts, err
+	}
+	opts.xfsDataSW = int(xfsdatasw)
 
 	if opts.Force == "" {
 		opts.Force = "false"
+	}
+	opts.force, err = strconv.ParseBool(opts.Force)
+	if err != nil {
+		return opts, err
 	}
 
 	return opts, nil
@@ -240,40 +258,13 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	bSize, err := strconv.ParseInt(opts.BlockSize, 10, 32)
-	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
-	}
-
-	XFSDataSW, err := strconv.ParseInt(opts.XFSDataSW, 10, 32)
-	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
-	}
-
-	force, err := strconv.ParseBool(opts.Force)
-	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
-	}
-
 	mounter := linstor.FSUtil{
 		Resource:  &linstor.Resource{Name: opts.getResource()},
 		FSType:    opts.FsType,
-		BlockSize: bSize,
-		Force:     force,
+		BlockSize: opts.blockSize,
+		Force:     opts.force,
 		XFSDataSU: opts.XFSDataSU,
-		XFSDataSW: int(XFSDataSW),
+		XFSDataSW: opts.xfsDataSW,
 		XFSLogDev: opts.XFSLogDev,
 	}
 
