@@ -28,6 +28,10 @@ on the kubelet and kube-controller-manager nodes:
 After installation, restarting kubelet process is required on each node
 for Kubernetes versions older than 1.8.
 
+You must set the `--enable-controller-attach-detach=false` option on all
+kubelets. For systemd managed kubelets this can be set in
+`/etc/systemd/system/kubelet.service.d/10-kubeadm.conf`
+
 ## Usage
 
 Resources must be created before attachment with Linstor or
