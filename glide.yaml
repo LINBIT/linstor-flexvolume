@@ -1,4 +1,0 @@
-package: github.com/LINBIT/linstor-flexvolume
-import:
-- package: github.com/LINBIT/golinstor
-  version: v0.8.0
