@@ -27,23 +27,110 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/satori/go.uuid"
 )
 
-// Resource contains all the information needed to query and assign/deploy
-// a resource. If you're deploying a resource, Redundancy is required. If you're
-// assigning a resource to a particular node, NodeName is required.
-type Resource struct {
+// ResourceDeployment contains all the information needed to query and assign/deploy
+// a resource.
+type ResourceDeployment struct {
+	ResourceDeploymentConfig
+	autoPlaced bool
+}
+
+// ResourceDeploymentConfig is a configuration object for ResourceDeployment.
+// If you're deploying a resource, AutoPlace is required. If you're
+// assigning a resource to particular nodes, NodeList is required.
+type ResourceDeploymentConfig struct {
 	Name                string
-	NodeName            string
-	Redundancy          string
 	NodeList            []string
 	ClientList          []string
-	AutoPlace           string
+	AutoPlace           uint64
 	DoNotPlaceWithRegex string
 	SizeKiB             uint64
 	StoragePool         string
 	DisklessStoragePool string
 	Encryption          bool
+	Controllers         string
+}
+
+// NewResourceDeployment creates a new ResourceDeployment object. This tolerates
+// some pretty janky ResourceDeploymentConfigs here is the breakdown of how
+// that is handled:
+// If no Name is given, a UUID is generated and used.
+// If no NodeList is given, assignment will be automatically placed.
+// If no ClientList is given, no client assignments will be made.
+// If there are duplicates within ClientList or NodeList, they will be removed.
+// If there are duplicates between ClientList and NodeList, duplicates in the ClientList will be removed.
+// If no AutoPlace Value is given AND there is no NodeList and no ClientList, it will default to 1.
+// If no DoNotPlaceWithRegex is provided resource assignment will occur without it.
+// If no SizeKiB is provided, it will be given a size of 4096kb.
+// If no StoragePool is provided, the default storage pool will be used.
+// If no DisklessStoragePool is provided, the default diskless storage pool will be used.
+// If no Encryption is specified, none will be used.
+// If no Controllers are specified, none will be used.
+func NewResourceDeployment(c ResourceDeploymentConfig) ResourceDeployment {
+	r := ResourceDeployment{c, false}
+
+	if r.Name == "" {
+		r.Name = fmt.Sprintf("%s", uuid.NewV4())
+	}
+
+	if len(r.NodeList) == 0 && r.AutoPlace == 0 {
+		if len(r.NodeList) == 0 && len(r.ClientList) == 0 && r.AutoPlace == 0 {
+			r.AutoPlace = 1
+		}
+	}
+	if r.AutoPlace > 0 {
+		r.autoPlaced = true
+	}
+
+	r.NodeList = uniq(r.NodeList)
+	r.ClientList = uniq(r.ClientList)
+	r.ClientList = subtract(r.NodeList, r.ClientList)
+
+	if r.SizeKiB == 0 {
+		r.SizeKiB = 4096
+	}
+
+	if r.StoragePool == "" {
+		r.StoragePool = "DfltStorPool"
+	}
+
+	if r.DisklessStoragePool == "" {
+		r.DisklessStoragePool = "DfltDisklessStorPool"
+	}
+
+	return r
+}
+
+// uniq removes duplicates from a []string.
+func uniq(strs []string) []string {
+	seen := map[string]bool{}
+
+	return unSeen(seen, strs)
+}
+
+// subtracts removes elements in s1 from s2.
+func subtract(s1, s2 []string) []string {
+	seen := map[string]bool{}
+	for _, s := range s1 {
+		seen[s] = true
+	}
+
+	return unSeen(seen, s2)
+}
+
+// unSeen returns a []string containing elements not present in seen.
+func unSeen(seen map[string]bool, strs []string) []string {
+	result := []string{}
+	for _, s := range strs {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 type resList []struct {
@@ -144,19 +231,26 @@ func linstorSuccess(retcode uint64) bool {
 }
 
 // CreateAndAssign deploys the resource, created a new one if it doesn't exist.
-func (r Resource) CreateAndAssign() error {
+func (r ResourceDeployment) CreateAndAssign() error {
 	if err := r.Create(); err != nil {
 		return err
 	}
 	return r.Assign()
 }
 
+func (r ResourceDeployment) prependOpts(args ...string) []string {
+	a := []string{"-m"}
+	if r.Controllers != "" {
+		a = append(a, "--controllers", r.Controllers)
+	}
+	return append(a, args...)
+}
+
 // Only use this for things that return the normal returnStatuses json.
-func linstor(args ...string) error {
-	args = append([]string{"-m"}, args...)
-	out, err := exec.Command("linstor", args...).CombinedOutput()
+func (r ResourceDeployment) linstor(args ...string) error {
+	out, err := exec.Command("linstor", r.prependOpts(args...)...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%v : %s", err, out)
+		return fmt.Errorf("%s: %v", err, out)
 	}
 
 	if !json.Valid(out) {
@@ -170,10 +264,9 @@ func linstor(args ...string) error {
 	return s.validate()
 }
 
-func listResources() (resList, error) {
+func (r ResourceDeployment) listResources() (resList, error) {
 	list := resList{}
-
-	out, err := exec.Command("linstor", "-m", "resource", "list").CombinedOutput()
+	out, err := exec.Command("linstor", r.prependOpts("resource", "list")...).CombinedOutput()
 	if err != nil {
 		return list, err
 	}
@@ -189,14 +282,14 @@ func listResources() (resList, error) {
 }
 
 // Create reserves the resource name in Linstor.
-func (r Resource) Create() error {
+func (r ResourceDeployment) Create() error {
 	defPresent, volZeroPresent, err := r.checkDefined()
 	if err != nil {
 		return err
 	}
 
 	if !defPresent {
-		if err := linstor("resource-definition", "create", r.Name); err != nil {
+		if err := r.linstor("resource-definition", "create", r.Name); err != nil {
 			return fmt.Errorf("unable to reserve resource name %s :%v", r.Name, err)
 		}
 	}
@@ -208,7 +301,7 @@ func (r Resource) Create() error {
 			args = append(args, "--encrypt")
 		}
 
-		if err := linstor(args...); err != nil {
+		if err := r.linstor(args...); err != nil {
 			return fmt.Errorf("unable to reserve resource name %s :%v", r.Name, err)
 		}
 	}
@@ -216,8 +309,8 @@ func (r Resource) Create() error {
 	return nil
 }
 
-func (r Resource) checkDefined() (bool, bool, error) {
-	out, err := exec.Command("linstor", "-m", "resource-definition", "list").CombinedOutput()
+func (r ResourceDeployment) checkDefined() (bool, bool, error) {
+	out, err := exec.Command("linstor", r.prependOpts("resource-definition", "list")...).CombinedOutput()
 	if err != nil {
 		return false, false, fmt.Errorf("%v: %s", err, out)
 	}
@@ -250,7 +343,7 @@ func (r Resource) checkDefined() (bool, bool, error) {
 
 // Assign assigns a resource with diskfull storage to all nodes in its NodeList,
 // then attaches the resource disklessly to all nodes in its ClientList.
-func (r Resource) Assign() error {
+func (r ResourceDeployment) Assign() error {
 
 	for _, node := range r.NodeList {
 		present, err := r.OnNode(node)
@@ -258,7 +351,7 @@ func (r Resource) Assign() error {
 			return fmt.Errorf("unable to assign resource %s failed to check if it was already present on node %s: %v", r.Name, node, err)
 		}
 		if !present {
-			if err = linstor("resource", "create", node, r.Name, "-s", r.StoragePool); err != nil {
+			if err = r.linstor("resource", "create", node, r.Name, "-s", r.StoragePool); err != nil {
 				return err
 			}
 		}
@@ -270,24 +363,20 @@ func (r Resource) Assign() error {
 			return fmt.Errorf("unable to assign resource %s failed to check if it was already present on node %s: %v", r.Name, node, err)
 		}
 
-		if r.DisklessStoragePool == "" {
-			r.DisklessStoragePool = "DfltDisklessStorPool"
-		}
-
 		if !present {
-			if err = linstor("resource", "create", node, r.Name, "-s", r.DisklessStoragePool); err != nil {
+			if err = r.linstor("resource", "create", node, r.Name, "-s", r.DisklessStoragePool); err != nil {
 				return err
 			}
 		}
 	}
 
-	if r.AutoPlace != "" {
-		args := []string{"resource", "create", r.Name, "--auto-place", r.AutoPlace}
+	if r.autoPlaced {
+		args := []string{"resource", "create", r.Name, "--auto-place", strconv.FormatUint(r.AutoPlace, 10)}
 		if r.DoNotPlaceWithRegex != "" {
 			args = append(args, "--do-not-place-with-regex", r.DoNotPlaceWithRegex)
 		}
 
-		if err := linstor(args...); err != nil {
+		if err := r.linstor(args...); err != nil {
 			return err
 		}
 	}
@@ -296,15 +385,15 @@ func (r Resource) Assign() error {
 }
 
 // Unassign unassigns a resource from a particular node.
-func (r Resource) Unassign(nodeName string) error {
-	if err := linstor("resource", "delete", nodeName, r.Name); err != nil {
+func (r ResourceDeployment) Unassign(nodeName string) error {
+	if err := r.linstor("resource", "delete", nodeName, r.Name); err != nil {
 		return fmt.Errorf("failed to unassign resource %s from node %s: %v", r.Name, nodeName, err)
 	}
 	return nil
 }
 
 // Delete removes a resource entirely from all nodes.
-func (r Resource) Delete() error {
+func (r ResourceDeployment) Delete() error {
 	defPresent, _, err := r.checkDefined()
 	if err != nil {
 		return fmt.Errorf("failed to delete resource %s: %v", r.Name, err)
@@ -316,15 +405,15 @@ func (r Resource) Delete() error {
 		return nil
 	}
 
-	if err := linstor("resource-definition", "delete", r.Name); err != nil {
+	if err := r.linstor("resource-definition", "delete", r.Name); err != nil {
 		return fmt.Errorf("failed to delete resource %s: %v", r.Name, err)
 	}
 	return nil
 }
 
 // Exists checks to see if a resource is defined in DRBD Manage.
-func (r Resource) Exists() (bool, error) {
-	l, err := listResources()
+func (r ResourceDeployment) Exists() (bool, error) {
+	l, err := r.listResources()
 	if err != nil {
 		return false, err
 	}
@@ -344,8 +433,8 @@ func doResExists(resourceName string, resources resList) (bool, error) {
 }
 
 //OnNode determines if a resource is present on a particular node.
-func (r Resource) OnNode(nodeName string) (bool, error) {
-	l, err := listResources()
+func (r ResourceDeployment) OnNode(nodeName string) (bool, error) {
+	l, err := r.listResources()
 	if err != nil {
 		return false, err
 	}
@@ -363,8 +452,8 @@ func doResOnNode(list resList, resName, nodeName string) bool {
 }
 
 // IsClient determines if resource is running as a client on nodeName.
-func (r Resource) IsClient(nodeName string) bool {
-	l, err := listResources()
+func (r ResourceDeployment) IsClient(nodeName string) bool {
+	l, err := r.listResources()
 	if err != nil {
 		return false
 	}
@@ -372,7 +461,7 @@ func (r Resource) IsClient(nodeName string) bool {
 	return r.doIsClient(l, nodeName)
 }
 
-func (r Resource) doIsClient(list resList, nodeName string) bool {
+func (r ResourceDeployment) doIsClient(list resList, nodeName string) bool {
 	// Traverse all the volume states to find volume 0 of our resource on nodeName.
 	// Assume volume 0 is the one we want.
 	for _, res := range list[0].ResourceStates {
@@ -398,20 +487,21 @@ func EnoughFreeSpace(requestedKiB, replicas string) error {
 
 // FSUtil handles creating a filesystem and mounting resources.
 type FSUtil struct {
-	*Resource
+	*ResourceDeployment
 	BlockSize int64
 	FSType    string
 	Force     bool
 	XFSDataSU string
 	XFSDataSW int
 	XFSLogDev string
+	MountOpts string
 
 	args []string
 }
 
 // Mount the FSUtil's resource on the path.
 func (f FSUtil) Mount(path string) error {
-	device, err := WaitForDevPath(*f.Resource, 3)
+	device, err := WaitForDevPath(*f.ResourceDeployment, 3)
 	if err != nil {
 		return fmt.Errorf("unable to mount device, couldn't find Resource device path: %v", err)
 	}
@@ -426,7 +516,13 @@ func (f FSUtil) Mount(path string) error {
 		return fmt.Errorf("unable to mount device, failed to make mount directory: %v: %s", err, out)
 	}
 
-	out, err = exec.Command("mount", device, path).CombinedOutput()
+	if f.MountOpts == "" {
+		f.MountOpts = "defaults"
+	}
+
+	args := []string{"-o", f.MountOpts, device, path}
+
+	out, err = exec.Command("mount", args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("unable to mount device: %v: %s", err, out)
 	}
@@ -581,7 +677,7 @@ func doCheckFSType(s string) (string, error) {
 }
 
 // WaitForDevPath polls until the resourse path appears on the system.
-func WaitForDevPath(r Resource, maxRetries int) (string, error) {
+func WaitForDevPath(r ResourceDeployment, maxRetries int) (string, error) {
 	var path string
 	var err error
 
@@ -595,8 +691,8 @@ func WaitForDevPath(r Resource, maxRetries int) (string, error) {
 	return path, err
 }
 
-func GetDevPath(r Resource, stat bool) (string, error) {
-	list, err := listResources()
+func GetDevPath(r ResourceDeployment, stat bool) (string, error) {
+	list, err := r.listResources()
 	if err != nil {
 		return "", err
 	}

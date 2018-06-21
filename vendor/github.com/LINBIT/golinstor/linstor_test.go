@@ -23,7 +23,159 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+
+	"github.com/satori/go.uuid"
 )
+
+func TestNewResourceDeployment(t *testing.T) {
+	// Test totally unconfigured deployment.
+	res := NewResourceDeployment(ResourceDeploymentConfig{})
+	if _, err := uuid.FromString(res.Name); err != nil {
+		t.Errorf("Expected a UUID got %s", res.Name)
+	}
+	if res.AutoPlace != 1 {
+		t.Errorf("Expected autoplace to be %d, got %d", 1, res.AutoPlace)
+	}
+	if res.SizeKiB != 4096 {
+		t.Errorf("Expected SizeKiB to be %d, got %d", 4096, res.SizeKiB)
+	}
+	if res.StoragePool != "DfltStorPool" {
+		t.Errorf("Expected StoragePool to be %s, got %s", "DfltStorPool", res.StoragePool)
+	}
+	if res.DisklessStoragePool != "DfltDisklessStorPool" {
+		t.Errorf("Expected DisklessStoragePool to be %s, got %s", "DfltDisklessStorPool", res.DisklessStoragePool)
+	}
+	if res.Controllers != "" {
+		t.Errorf("Expected Controllers to be %s, got %s", "", res.Controllers)
+	}
+
+	// Test regularly configured deployment autoplace.
+	name := "Agamemnon"
+	res = NewResourceDeployment(
+		ResourceDeploymentConfig{
+			Name:        name,
+			AutoPlace:   5,
+			SizeKiB:     10000,
+			Controllers: "192.168.100.100:9001,172.5.1.30:5605,192.168.5.1:8080",
+		},
+	)
+	if res.Name != name {
+		t.Errorf("Expected %s to equal %s", res.Name, name)
+	}
+	if res.AutoPlace != 5 {
+		t.Errorf("Expected autoplace to be %d, got %d", 5, res.AutoPlace)
+	}
+	if res.SizeKiB != 10000 {
+		t.Errorf("Expected SizeKiB to be %d, got %d", 10000, res.SizeKiB)
+	}
+	if res.Controllers != "192.168.100.100:9001,172.5.1.30:5605,192.168.5.1:8080" {
+		t.Errorf("Expected Controllers to be %s, got %s", "192.168.100.100:9001,172.5.1.30:5605,192.168.5.1:8080", res.Controllers)
+	}
+
+	// Test regularly configured deployment manual.
+	nodes := []string{"host1", "host2"}
+	res = NewResourceDeployment(
+		ResourceDeploymentConfig{
+			NodeList: nodes,
+			SizeKiB:  10000,
+		})
+	if res.AutoPlace != 0 {
+		t.Errorf("Expected autoplace to be %d, got %d", 0, res.AutoPlace)
+	}
+	if !reflect.DeepEqual(res.NodeList, nodes) {
+		t.Errorf("Expected: %v, Got: %v", nodes, res.NodeList)
+	}
+}
+
+func TestPrependOpts(t *testing.T) {
+	var optsTests = []struct {
+		in  []string
+		out []string
+	}{
+		{[]string{"resource", "list"},
+			[]string{"-m", "resource", "list"}},
+		{[]string{"fee", "fie", "fo", "fum"},
+			[]string{"-m", "fee", "fie", "fo", "fum"}},
+	}
+
+	r1 := NewResourceDeployment(ResourceDeploymentConfig{})
+
+	for _, tt := range optsTests {
+		result := r1.prependOpts(tt.in...)
+		if !reflect.DeepEqual(result, tt.out) {
+			t.Errorf("Called: prependOpts(%v), Expected: %v, Got: %v. %+v", tt.in, tt.out, result, r1)
+		}
+	}
+
+	r2 := NewResourceDeployment(
+		ResourceDeploymentConfig{
+			Controllers: "192.168.100.100:9001,172.5.1.30:5605",
+		},
+	)
+
+	var optsTestsControllers = []struct {
+		in  []string
+		out []string
+	}{
+		{[]string{"resource", "list"},
+			[]string{"-m", "--controllers", r2.Controllers, "resource", "list"}},
+		{[]string{"fee", "fie", "fo", "fum"},
+			[]string{"-m", "--controllers", r2.Controllers, "fee", "fie", "fo", "fum"}},
+	}
+
+	for _, tt := range optsTestsControllers {
+		result := r2.prependOpts(tt.in...)
+		if !reflect.DeepEqual(result, tt.out) {
+			t.Errorf("Called: prependOpts(%v), Expected: %v, Got: %v. %+v", tt.in, tt.out, result, r2)
+		}
+	}
+}
+
+func TestUniq(t *testing.T) {
+
+	var uniqTests = []struct {
+		in  []string
+		out []string
+	}{
+		{[]string{"foo", "bar", "foo", "baz", "baz"},
+			[]string{"foo", "bar", "baz"}},
+		{[]string{"fee", "fie", "fo", "fum"},
+			[]string{"fee", "fie", "fo", "fum"}},
+	}
+
+	for _, tt := range uniqTests {
+		result := uniq(tt.in)
+		if !reflect.DeepEqual(result, tt.out) {
+			t.Errorf("Called: uniq(%v), Expected: %v, Got: %v", tt.in, tt.out, result)
+		}
+	}
+}
+
+func TestSubtract(t *testing.T) {
+
+	var subTests = []struct {
+		s1  []string
+		s2  []string
+		out []string
+	}{
+		{[]string{"foo", "bar", "foo", "baz", "baz"},
+			[]string{"foo", "bar", "baz"},
+			[]string{}},
+		{[]string{"foo", "bar", "foo", "baz", "baz"},
+			[]string{"fee", "fie", "fo", "fum"},
+			[]string{"fee", "fie", "fo", "fum"}},
+		{[]string{"cat", "dog", "monkey"},
+			[]string{"pineapple", "peach", "dog", "mango"},
+			[]string{"pineapple", "peach", "mango"}},
+	}
+
+	for _, tt := range subTests {
+		result := subtract(tt.s1, tt.s2)
+		if !reflect.DeepEqual(result, tt.out) {
+			t.Errorf("Called: uniq(%v, %v), Expected: %v, Got: %v", tt.s1, tt.s2, tt.out, result)
+		}
+	}
+}
 
 func TestDoResExists(t *testing.T) {
 
@@ -154,7 +306,7 @@ func TestDoIsClient(t *testing.T) {
 	}
 
 	for _, tt := range isClientTests {
-		r := Resource{Name: tt.resource}
+		r := NewResourceDeployment(ResourceDeploymentConfig{Name: tt.resource})
 
 		ok := r.doIsClient(tt.l, tt.node)
 
@@ -162,7 +314,6 @@ func TestDoIsClient(t *testing.T) {
 			t.Errorf("Expected: %v on %s Got: %v", tt.out, tt.node, ok)
 		}
 	}
-
 }
 
 func TestDoResOnNode(t *testing.T) {

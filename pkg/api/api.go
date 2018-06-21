@@ -75,6 +75,7 @@ type options struct {
 	XFSDataSW           string `json:"xfsDataSw"`
 	XFSLogDev           string `json:"xfsLogDev"`
 	DisklessStoragePool string `json:"disklessStoragePool"`
+	MountOpts           string `json:"mountOpts"`
 
 	// Parsed option ready to pass to linstor.FSUtil
 	xfsDataSW int
@@ -180,11 +181,11 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := linstor.Resource{
+	resource := linstor.NewResourceDeployment(linstor.ResourceDeploymentConfig{
 		Name:                opts.getResource(),
 		ClientList:          []string{s[2]},
 		DisklessStoragePool: opts.DisklessStoragePool,
-	}
+	})
 
 	err = resource.Assign()
 	if err != nil {
@@ -223,7 +224,8 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 		return tooFewArgsResponse(s)
 	}
 
-	resource := linstor.Resource{Name: s[1]}
+	resource := linstor.NewResourceDeployment(
+		linstor.ResourceDeploymentConfig{Name: s[1]})
 
 	// Do not unassign resources that have local storage.
 	if !resource.IsClient(s[2]) {
@@ -257,15 +259,18 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		})
 		return string(res), EXITBADAPICALL
 	}
+	r := linstor.NewResourceDeployment(
+		linstor.ResourceDeploymentConfig{Name: opts.getResource()})
 
 	mounter := linstor.FSUtil{
-		Resource:  &linstor.Resource{Name: opts.getResource()},
-		FSType:    opts.FsType,
-		BlockSize: opts.blockSize,
-		Force:     opts.force,
-		XFSDataSU: opts.XFSDataSU,
-		XFSDataSW: opts.xfsDataSW,
-		XFSLogDev: opts.XFSLogDev,
+		ResourceDeployment: &r,
+		FSType:             opts.FsType,
+		BlockSize:          opts.blockSize,
+		Force:              opts.force,
+		XFSDataSU:          opts.XFSDataSU,
+		XFSDataSW:          opts.xfsDataSW,
+		XFSLogDev:          opts.XFSLogDev,
+		MountOpts:          opts.MountOpts,
 	}
 
 	err = mounter.Mount(s[1])
@@ -340,7 +345,8 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 
-	resource := linstor.Resource{Name: opts.getResource()}
+	resource := linstor.NewResourceDeployment(
+		linstor.ResourceDeploymentConfig{Name: opts.getResource()})
 
 	ok, err := resource.OnNode(s[2])
 	if err != nil {
