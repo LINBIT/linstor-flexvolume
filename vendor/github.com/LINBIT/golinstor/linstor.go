@@ -345,33 +345,12 @@ func (r ResourceDeployment) checkDefined() (bool, bool, error) {
 // then attaches the resource disklessly to all nodes in its ClientList.
 func (r ResourceDeployment) Assign() error {
 
-	for _, node := range r.NodeList {
-		present, err := r.OnNode(node)
-		if err != nil {
-			return fmt.Errorf("unable to assign resource %s failed to check if it was already present on node %s: %v", r.Name, node, err)
-		}
-		if !present {
-			if err = r.linstor("resource", "create", node, r.Name, "-s", r.StoragePool); err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, node := range r.ClientList {
-		present, err := r.OnNode(node)
-		if err != nil {
-			return fmt.Errorf("unable to assign resource %s failed to check if it was already present on node %s: %v", r.Name, node, err)
-		}
-
-		if !present {
-			if err = r.linstor("resource", "create", node, r.Name, "-s", r.DisklessStoragePool); err != nil {
-				return err
-			}
-		}
+	if err := r.deployToList(r.NodeList, false); err != nil {
+		return err
 	}
 
 	if r.autoPlaced {
-		args := []string{"resource", "create", r.Name, "--auto-place", strconv.FormatUint(r.AutoPlace, 10)}
+		args := []string{"resource", "create", r.Name, "-s", r.StoragePool, "--auto-place", strconv.FormatUint(r.AutoPlace, 10)}
 		if r.DoNotPlaceWithRegex != "" {
 			args = append(args, "--do-not-place-with-regex", r.DoNotPlaceWithRegex)
 		}
@@ -381,6 +360,27 @@ func (r ResourceDeployment) Assign() error {
 		}
 	}
 
+	return r.deployToList(r.ClientList, true)
+}
+
+func (r ResourceDeployment) deployToList(list []string, asClients bool) error {
+	for _, node := range list {
+		present, err := r.OnNode(node)
+		if err != nil {
+			return fmt.Errorf("unable to assign resource %s failed to check if it was already present on node %s: %v", r.Name, node, err)
+		}
+
+		pool := r.StoragePool
+		if asClients {
+			pool = r.DisklessStoragePool
+		}
+
+		if !present {
+			if err = r.linstor("resource", "create", node, r.Name, "-s", pool); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
