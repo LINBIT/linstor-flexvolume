@@ -21,6 +21,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"log/syslog"
 	"strconv"
 
 	linstor "github.com/LINBIT/golinstor"
@@ -126,6 +129,17 @@ func parseOptions(s string) (options, error) {
 	return opts, nil
 }
 
+var logOutput io.Writer
+
+func init() {
+	out, err := syslog.New(syslog.LOG_INFO, "Linstor FlexVolume")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	logOutput = out
+}
+
 type FlexVolumeApi struct{}
 
 func (api FlexVolumeApi) Call(s []string) (string, int) {
@@ -185,6 +199,7 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		Name:                opts.getResource(),
 		ClientList:          []string{s[2]},
 		DisklessStoragePool: opts.DisklessStoragePool,
+		LogOut:              logOutput,
 	})
 
 	err = resource.Assign()
@@ -225,7 +240,10 @@ func (api FlexVolumeApi) detach(s []string) (string, int) {
 	}
 
 	resource := linstor.NewResourceDeployment(
-		linstor.ResourceDeploymentConfig{Name: s[1]})
+		linstor.ResourceDeploymentConfig{
+			Name:   s[1],
+			LogOut: logOutput,
+		})
 
 	// Do not unassign resources that have local storage.
 	if !resource.IsClient(s[2]) {
@@ -260,7 +278,9 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		return string(res), EXITBADAPICALL
 	}
 	r := linstor.NewResourceDeployment(
-		linstor.ResourceDeploymentConfig{Name: opts.getResource()})
+		linstor.ResourceDeploymentConfig{Name: opts.getResource(),
+			LogOut: logOutput,
+		})
 
 	mounter := linstor.FSUtil{
 		ResourceDeployment: &r,
@@ -346,7 +366,9 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 	}
 
 	resource := linstor.NewResourceDeployment(
-		linstor.ResourceDeploymentConfig{Name: opts.getResource()})
+		linstor.ResourceDeploymentConfig{Name: opts.getResource(),
+			LogOut: logOutput,
+		})
 
 	ok, err := resource.OnNode(s[2])
 	if err != nil {
