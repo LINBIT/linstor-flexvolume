@@ -23,6 +23,7 @@ spec:
         resource: "r0"
         blockSize: "4096"
         force: "true"
+        xfsDiscardBlocks: "true"
         xfsDataSu: "128k"
         xfsDataSw: "1"
         xfsLogDev: "/tmp/example"

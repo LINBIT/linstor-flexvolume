@@ -74,6 +74,7 @@ type options struct {
 	Resource            string `json:"resource"`
 	BlockSize           string `json:"blockSize"`
 	Force               string `json:"force"`
+	XFSDiscardBlocks    string `json:"xfsDiscardBlocks"`
 	XFSDataSU           string `json:"xfsDataSu"`
 	XFSDataSW           string `json:"xfsDataSw"`
 	XFSLogDev           string `json:"xfsLogDev"`
@@ -81,9 +82,10 @@ type options struct {
 	MountOpts           string `json:"mountOpts"`
 
 	// Parsed option ready to pass to linstor.FSUtil
-	xfsDataSW int
-	blockSize int64
-	force     bool
+	xfsDataSW        int
+	blockSize        int64
+	force            bool
+	xfsdiscardblocks bool
 }
 
 func (o *options) getResource() string {
@@ -122,6 +124,14 @@ func parseOptions(s string) (options, error) {
 		opts.Force = "false"
 	}
 	opts.force, err = strconv.ParseBool(opts.Force)
+	if err != nil {
+		return opts, err
+	}
+
+	if opts.XFSDiscardBlocks == "" {
+		opts.XFSDiscardBlocks = "false"
+	}
+	opts.xfsdiscardblocks, err = strconv.ParseBool(opts.XFSDiscardBlocks)
 	if err != nil {
 		return opts, err
 	}
@@ -287,6 +297,7 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		FSType:             opts.FsType,
 		BlockSize:          opts.blockSize,
 		Force:              opts.force,
+		XFSDiscardBlocks:   opts.xfsdiscardblocks,
 		XFSDataSU:          opts.XFSDataSU,
 		XFSDataSW:          opts.xfsDataSW,
 		XFSLogDev:          opts.XFSLogDev,

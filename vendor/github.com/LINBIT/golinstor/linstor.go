@@ -505,13 +505,14 @@ func EnoughFreeSpace(requestedKiB, replicas string) error {
 // FSUtil handles creating a filesystem and mounting resources.
 type FSUtil struct {
 	*ResourceDeployment
-	BlockSize int64
-	FSType    string
-	Force     bool
-	XFSDataSU string
-	XFSDataSW int
-	XFSLogDev string
-	MountOpts string
+	BlockSize        int64
+	FSType           string
+	Force            bool
+	XFSDiscardBlocks bool
+	XFSDataSU        string
+	XFSDataSW        int
+	XFSLogDev        string
+	MountOpts        string
 
 	args []string
 }
@@ -539,7 +540,7 @@ func (f FSUtil) Mount(path string) error {
 
 	args := []string{"-o", f.MountOpts, device, path}
 
-	out, err = exec.Command("mount", args...).CombinedOutput()
+	out, err = f.traceCombinedOutput("mount", args...)
 	if err != nil {
 		return fmt.Errorf("unable to mount device: %v: %s", err, out)
 	}
@@ -597,7 +598,7 @@ func (f FSUtil) safeFormat(path string) error {
 	args = append(args, f.args...)
 	args = append(args, path)
 
-	out, err := exec.Command("mkfs", args...).CombinedOutput()
+	out, err := f.traceCombinedOutput("mkfs", args...)
 	if err != nil {
 		return fmt.Errorf("couldn't create %s filesystem %v: %q", f.FSType, err, out)
 	}
@@ -649,6 +650,10 @@ func (f *FSUtil) populateArgs() error {
 
 		if f.XFSLogDev != "" {
 			f.args = append(f.args, "-l", fmt.Sprintf("logdev=%s", f.XFSLogDev))
+		}
+
+		if !f.XFSDiscardBlocks {
+			f.args = append(f.args, "-K")
 		}
 	}
 
