@@ -2,7 +2,7 @@
 
 ## Building
 
-Requires Go 1.8 or higher and a configured GOPATH
+Requires Go 1.10 or higher and a configured GOPATH
 
 `mkdir -p $GOPATH/src/github.com/LINBIT/`
 
@@ -19,8 +19,8 @@ place it into the root of the project.
 
 ## Installing
 
-Place the generated binary named `linstor-flexvolume` under the following path 
-on the kubelet and kube-controller-manager nodes: 
+Place the generated binary named `linstor-flexvolume` under the following path
+on the kubelet and kube-controller-manager nodes:
 
 ```bash
 /usr/libexec/kubernetes/kubelet-plugins/volume/exec/linbit~linstor-flexvolume/
@@ -41,10 +41,11 @@ they are available for this plugin to use.
 The kube-controller-manager and all kubelets eligible to run containers must be
 part of the same Linstor cluster. Volumes will be attached to the kubelet
 across the network via the DRBD Transport protocol, so they do not require local
-storage. You will need to install the Linstor Client on each kubelet and you
-must configure a list of controllers via configuration files such as
-`/etc/linstor/linstor-client.conf`, rather than using the `LS_CONTROLLERS`
-environment variable.
+storage. You will need to install the Linstor Client on each kubelet and
+unless the Linstor controller is running locally, you'll need to pass in the
+`controllers` option in order to communicate with the Linstor controller.
+Either via setting in the StorageClass and using the refular PVC notation, or
+by using the flexvolume notation>
 
 Kubelet nodes names must match the output of `uname -n` exactly. If they do not,
 this may be overridden via the kubelet `--hostname-override` parameter

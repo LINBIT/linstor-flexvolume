@@ -27,4 +27,5 @@ spec:
         xfsDataSu: "128k"
         xfsDataSw: "1"
         xfsLogDev: "/tmp/example"
+        controllers: "192.168.100.100:3367"
 
