@@ -1,4 +1,5 @@
 PROJECT_NAME = `basename $$PWD`
+LATESTTAG=$(shell git describe --abbrev=0 --tags | tr -d 'v')
 VERSION=`git describe --tags --always --dirty`
 OS=linux
 ARCH=amd64
@@ -37,3 +38,13 @@ clean:
 
 distclean: clean
 	$(RM) $(RM_FLAGS) $(PROJECT_NAME)-$(OS)-$(ARCH)
+
+# packaging, you need the packaging branch for these
+
+# we build binary-only packages and use the static binary in this tarball
+linstor-flexvolume-$(LATESTTAG).tar.gz: build
+	dh_clean || true
+	tar --transform="s,^,linstor-flexvolume-$(LATESTTAG)/," --owner=0 --group=0 -czf $@ linstor-flexvolume debian linstor-flexvolume.spec
+
+# consistency with the other linbit projects
+debrelease: linstor-flexvolume-$(LATESTTAG).tar.gz
