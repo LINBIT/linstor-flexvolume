@@ -11,7 +11,8 @@ Group: Applications/System
 %define OPENSHIFTPATH /usr/libexec/kubernetes/kubelet-plugins/volume/exec/linbit~linstor-flexvolume
 
 %description
-TODO.
+Flexvolume driver implementation for Linstor volumes
+
 
 %prep
 %setup -q
@@ -26,11 +27,11 @@ cp %{_builddir}/%{name}-%{version}/%{name} %{buildroot}/%{OPENSHIFTPATH}/
 
 ### kubernetes
 %package kubernetes
-Summary: TODO
+Summary: Google's Container Orchestration Platform
 Requires: linstor-satellite
 
 %description kubernetes
-TODO.
+Kubernetes manages the lifecycle of containerized applications
 
 
 %files kubernetes
@@ -38,11 +39,11 @@ TODO.
 
 ### openshift
 %package openshift
-Summary: TODO
+Summary: Red Hat's Container Orchestration Platform
 Requires: linstor-satellite
 
 %description openshift
-TODO.
+Openshift manages the lifecycle of containerized applications and has a GUI
 
 
 %files openshift
