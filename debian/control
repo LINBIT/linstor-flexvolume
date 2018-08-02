@@ -10,6 +10,6 @@ Homepage: https://github.com/LINBIT/linstor-flexvolume
 
 Package: linstor-flexvolume-kubernetes
 Architecture: amd64
-Depends: drbd-utils (>= 9.0.0), linstor-satellite, ${shlibs:Depends}, ${misc:Depends}
+Depends: drbd-utils (>= 9.0.0), linstor-satellite, linstor-client, ${shlibs:Depends}, ${misc:Depends}
 Description: TODO
  TODO.
