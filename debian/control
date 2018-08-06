@@ -12,3 +12,5 @@ Package: linstor-flexvolume-kubernetes
 Architecture: amd64
 Depends: drbd-utils (>= 9.0.0), linstor-satellite, linstor-client, ${shlibs:Depends}, ${misc:Depends}
 Description: Flexvolume driver implementation for Linstor volumes
+ Flexvolume driver implementation for Linstor volumes. Manages the lifecycle
+ of kubernetes volumes backed by Linstor.
