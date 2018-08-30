@@ -80,6 +80,7 @@ type options struct {
 	XFSLogDev           string `json:"xfsLogDev"`
 	DisklessStoragePool string `json:"disklessStoragePool"`
 	MountOpts           string `json:"mountOpts"`
+	FSOpts              string `json:"fsOpts"`
 
 	// Parsed option ready to pass to linstor.FSUtil
 	xfsDataSW        int
@@ -302,6 +303,7 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		XFSDataSW:          opts.xfsDataSW,
 		XFSLogDev:          opts.XFSLogDev,
 		MountOpts:          opts.MountOpts,
+		FSOpts:             opts.FSOpts,
 	}
 
 	err = mounter.Mount(s[1])

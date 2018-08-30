@@ -164,6 +164,9 @@ type resInfo struct {
 		VlmMinorNr   int    `json:"vlm_minor_nr"`
 		VlmUUID      string `json:"vlm_uuid"`
 		VlmDfnUUID   string `json:"vlm_dfn_uuid"`
+		MetaDisk     string `json:"meta_disk"`
+		DevicePath   string `json:"device_path"`
+		BackingDisk  string `json:"backing_disk"`
 	} `json:"vlms"`
 	NodeUUID string `json:"node_uuid"`
 	UUID     string `json:"uuid"`
@@ -512,6 +515,7 @@ type FSUtil struct {
 	XFSDataSU        string
 	XFSDataSW        int
 	XFSLogDev        string
+	FSOpts           string
 	MountOpts        string
 
 	args []string
@@ -529,6 +533,12 @@ func (f FSUtil) Mount(path string) error {
 		return fmt.Errorf("unable to mount device: %v", err)
 	}
 
+	if f.XFSLogDev != "" {
+		_, err = os.Stat(f.XFSLogDev)
+		if err != nil {
+			return fmt.Errorf("failed to stat xfs log device (%s): %v", f.XFSLogDev, err)
+		}
+	}
 	out, err := exec.Command("mkdir", "-p", path).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("unable to mount device, failed to make mount directory: %v: %s", err, out)
@@ -607,6 +617,13 @@ func (f FSUtil) safeFormat(path string) error {
 }
 
 func (f *FSUtil) populateArgs() error {
+
+	if f.FSOpts != "" {
+		f.args = strings.Split(f.FSOpts, " ")
+		return nil
+	}
+
+	// Everything below is depricated behavior.
 
 	xfs := "xfs"
 	ext4 := "ext4"
@@ -721,18 +738,22 @@ func GetDevPath(r ResourceDeployment, stat bool) (string, error) {
 
 	// Traverse all the volume states to find volume 0 of our resource.
 	// Assume volume 0 is the one we want.
-	var vol int
+	var devicePath string
 	for _, res := range list[0].Resources {
 		if r.Name == res.Name {
 			for _, v := range res.Vlms {
 				if v.VlmNr == 0 {
-					vol = v.VlmMinorNr
+					devicePath = v.DevicePath
+					break
 				}
 			}
 		}
 	}
 
-	devicePath := doGetDevPath(vol)
+	if devicePath == "" {
+		return devicePath, fmt.Errorf(
+			"unable to find the device path volume zero of %s in %+v", r.Name, list)
+	}
 
 	if stat {
 		if _, err := os.Lstat(devicePath); err != nil {
@@ -741,8 +762,4 @@ func GetDevPath(r ResourceDeployment, stat bool) (string, error) {
 	}
 
 	return devicePath, nil
-}
-
-func doGetDevPath(vol int) string {
-	return fmt.Sprintf("/dev/drbd%d", vol)
 }
