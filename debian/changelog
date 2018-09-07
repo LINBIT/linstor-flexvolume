@@ -1,3 +1,9 @@
+linstor-flexvolume (0.7.4-1) unstable; urgency=medium
+
+  * New upsteam version
+
+ -- Hayley Swimelar <hayley@linbit>  Fri, 07 Sep 2018 10:41:18 -0700
+
 linstor-flexvolume (0.7.3-1) unstable; urgency=medium
 
   * Initial Release.
