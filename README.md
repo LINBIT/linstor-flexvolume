@@ -34,6 +34,10 @@ kubelets. For systemd managed kubelets this can be set in
 
 ## Usage
 
+This project must be used in conjunction with a working LINSTOR cluster. [LINSTOR's
+documentation](https://docs.linbit.com/docs/users-guide-9.0/#p-linstor) is the
+foremost guide on setting up and administering LINSTOR.
+
 Resources must be created before attachment with Linstor or
 [linstor-external-provisioner](https://github.com/LINBIT/linstor-external-provisioner) before
 they are available for this plugin to use.
