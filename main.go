@@ -33,6 +33,10 @@ var Version string
 
 func main() {
 
+	if len(os.Args) == 1 {
+		fmt.Errorf("Invalid number of parameters")
+		os.Exit(1)
+	}
 	apiCall := os.Args[1]
 
 	// Print version and exit.
@@ -41,11 +45,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	sysLog, err := syslog.New(syslog.LOG_INFO, "Linstor FlexVolume")
-	if err != nil {
-		log.Fatal(err)
+	syslogOut, err := syslog.New(syslog.LOG_INFO, "Linstor FlexVolume")
+	if err == nil {
+		log.SetOutput(syslogOut)
+	} else {
+		fileOut, err := os.OpenFile("/tmp/linstor_flex", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer fileOut.Close()
+		log.SetOutput(fileOut)
 	}
-	log.SetOutput(sysLog)
 
 	log.Printf("called with %s: %s", apiCall, strings.Join(os.Args[2:], ", "))
 
