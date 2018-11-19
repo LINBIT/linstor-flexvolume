@@ -24,6 +24,7 @@ import (
 	"io"
 	"log"
 	"log/syslog"
+	"os"
 	"strconv"
 
 	linstor "github.com/LINBIT/golinstor"
@@ -222,7 +223,9 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 		return string(res), EXITDRBDFAILURE
 	}
 
-	path, err := linstor.GetDevPath(resource, false)
+	// Only one resource is attached at a time: it's safe to assume the zeroth
+	// element is node that we want.
+	path, err := resource.GetDevPath(resource.ClientList[0], false)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
@@ -306,7 +309,16 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 		FSOpts:             opts.FSOpts,
 	}
 
-	err = mounter.Mount(s[1])
+	localNode, err := os.Hostname()
+	if err != nil {
+		res, _ := json.Marshal(response{
+			Status:  "Failure",
+			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
+		})
+		return string(res), EXITDRBDFAILURE
+	}
+
+	err = mounter.Mount(s[1], localNode)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
