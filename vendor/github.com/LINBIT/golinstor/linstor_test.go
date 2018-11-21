@@ -72,6 +72,25 @@ func TestNewResourceDeployment(t *testing.T) {
 		t.Errorf("Expected Controllers to be %s, got %s", "192.168.100.100:9001,172.5.1.30:5605,192.168.5.1:8080", res.Controllers)
 	}
 
+	// Test regularly configured deployment autoplace.
+	name = "Agamemnon"
+	res = NewResourceDeployment(
+		ResourceDeploymentConfig{
+			Name:                name,
+			AutoPlace:           5,
+			SizeKiB:             10000,
+			Controllers:         "192.168.100.100:9001,172.5.1.30:5605,192.168.5.1:8080",
+			ReplicasOnSame:      []string{"foo", "bar", "baz"},
+			ReplicasOnDifferent: []string{"fee", "fie", "foe"},
+		},
+	)
+
+	expected := []string{"--replicas-on-same", "foo", "bar", "baz", "--replicas-on-different", "fee", "fie", "foe"}
+	if reflect.DeepEqual(res.autoPlaceArgs, expected) {
+		t.Errorf("Expected autoPlaceArgs to be %s, got %s", expected, res.autoPlaceArgs)
+
+	}
+
 	// Test regularly configured deployment manual.
 	nodes := []string{"host1", "host2"}
 	res = NewResourceDeployment(
@@ -334,13 +353,14 @@ func TestDoIsClient(t *testing.T) {
 
 func TestDoResOnNode(t *testing.T) {
 
-	out, err := ioutil.ReadFile("test_json/mixed_diskless.json")
+	out, err := ioutil.ReadFile("./test_json/mixed_diskless.json")
 	if err != nil {
 		t.Error(err)
 	}
 
 	list := resList{}
 	if err := json.Unmarshal(out, &list); err != nil {
+		t.Error(err)
 	}
 
 	var isClientTests = []struct {
@@ -362,4 +382,34 @@ func TestDoResOnNode(t *testing.T) {
 		}
 	}
 
+}
+
+func TestGetDevPath(t *testing.T) {
+	out, err := ioutil.ReadFile("./test_json/heterogeneous_device_paths.json")
+	if err != nil {
+		t.Error(err)
+	}
+
+	list := resList{}
+	if err := json.Unmarshal(out, &list); err != nil {
+		t.Error(err)
+	}
+
+	var devPathTests = []struct {
+		resource string
+		node     string
+		l        resList
+		expected string
+	}{
+		{"duck", "node-0", list, "/dev/nvme2n1"},
+		{"duck", "node-1", list, "/dev/null"},
+	}
+
+	for _, tt := range devPathTests {
+
+		path, _ := getDevPath(tt.l, tt.resource, tt.node)
+		if path != tt.expected {
+			t.Errorf("Expected: %s on %s Got: %v", tt.expected, tt.node, path)
+		}
+	}
 }

@@ -38,8 +38,9 @@ import (
 // a resource.
 type ResourceDeployment struct {
 	ResourceDeploymentConfig
-	autoPlaced bool
-	log        *log.Logger
+	autoPlaced    bool
+	autoPlaceArgs []string
+	log           *log.Logger
 }
 
 // ResourceDeploymentConfig is a configuration object for ResourceDeployment.
@@ -49,6 +50,8 @@ type ResourceDeploymentConfig struct {
 	Name                string
 	NodeList            []string
 	ClientList          []string
+	ReplicasOnSame      []string
+	ReplicasOnDifferent []string
 	AutoPlace           uint64
 	DoNotPlaceWithRegex string
 	SizeKiB             uint64
@@ -68,7 +71,7 @@ type ResourceDeploymentConfig struct {
 // If there are duplicates within ClientList or NodeList, they will be removed.
 // If there are duplicates between ClientList and NodeList, duplicates in the ClientList will be removed.
 // If no AutoPlace Value is given AND there is no NodeList and no ClientList, it will default to 1.
-// If no DoNotPlaceWithRegex is provided resource assignment will occur without it.
+// If no DoNotPlaceWithRegex, ReplicasOnSame, or ReplicasOnDifferent are provided resource assignment will occur without them.
 // If no SizeKiB is provided, it will be given a size of 4096kb.
 // If no StoragePool is provided, the default storage pool will be used.
 // If no DisklessStoragePool is provided, the default diskless storage pool will be used.
@@ -105,6 +108,19 @@ func NewResourceDeployment(c ResourceDeploymentConfig) ResourceDeployment {
 
 	if r.DisklessStoragePool == "" {
 		r.DisklessStoragePool = "DfltDisklessStorPool"
+	}
+
+	if r.DoNotPlaceWithRegex != "" {
+		r.autoPlaceArgs = append(r.autoPlaceArgs, "--do-not-place-with-regex", r.DoNotPlaceWithRegex)
+	}
+
+	if len(r.ReplicasOnSame) != 0 {
+		r.autoPlaceArgs = append(r.autoPlaceArgs, "--replicas-on-same")
+		r.autoPlaceArgs = append(r.autoPlaceArgs, r.ReplicasOnSame...)
+	}
+	if len(r.ReplicasOnDifferent) != 0 {
+		r.autoPlaceArgs = append(r.autoPlaceArgs, "--replicas-on-different")
+		r.autoPlaceArgs = append(r.autoPlaceArgs, r.ReplicasOnDifferent...)
 	}
 
 	if r.LogOut == nil {
@@ -270,7 +286,7 @@ func (r ResourceDeployment) traceCombinedOutput(name string, args ...string) ([]
 func (r ResourceDeployment) linstor(args ...string) error {
 	out, err := r.traceCombinedOutput("linstor", r.prependOpts(args...)...)
 	if err != nil {
-		return fmt.Errorf("%s: %v", err, out)
+		return fmt.Errorf("%v: %s", err, out)
 	}
 
 	if !json.Valid(out) {
@@ -371,9 +387,7 @@ func (r ResourceDeployment) Assign() error {
 
 	if r.autoPlaced {
 		args := []string{"resource", "create", r.Name, "-s", r.StoragePool, "--auto-place", strconv.FormatUint(r.AutoPlace, 10)}
-		if r.DoNotPlaceWithRegex != "" {
-			args = append(args, "--do-not-place-with-regex", r.DoNotPlaceWithRegex)
-		}
+		args = append(args, r.autoPlaceArgs...)
 
 		if err := r.linstor(args...); err != nil {
 			return err
@@ -522,8 +536,8 @@ type FSUtil struct {
 }
 
 // Mount the FSUtil's resource on the path.
-func (f FSUtil) Mount(path string) error {
-	device, err := WaitForDevPath(*f.ResourceDeployment, 3)
+func (f FSUtil) Mount(path, node string) error {
+	device, err := WaitForDevPath(*f.ResourceDeployment, node, 3)
 	if err != nil {
 		return fmt.Errorf("unable to mount device, couldn't find Resource device path: %v", err)
 	}
@@ -716,12 +730,12 @@ func doCheckFSType(s string) (string, error) {
 }
 
 // WaitForDevPath polls until the resourse path appears on the system.
-func WaitForDevPath(r ResourceDeployment, maxRetries int) (string, error) {
+func WaitForDevPath(r ResourceDeployment, node string, maxRetries int) (string, error) {
 	var path string
 	var err error
 
 	for i := 0; i < maxRetries; i++ {
-		path, err = GetDevPath(r, true)
+		path, err = r.GetDevPath(node, true)
 		if path != "" {
 			return path, err
 		}
@@ -730,17 +744,35 @@ func WaitForDevPath(r ResourceDeployment, maxRetries int) (string, error) {
 	return path, err
 }
 
-func GetDevPath(r ResourceDeployment, stat bool) (string, error) {
+// GetDevPath returns the path to the linstor volume on the given node.
+// If stat is set to true, the device will be stat'd as a loose test to
+// see if it is ready for IO.
+func (r ResourceDeployment) GetDevPath(node string, stat bool) (string, error) {
 	list, err := r.listResources()
 	if err != nil {
 		return "", err
 	}
 
+	devicePath, err := getDevPath(list, r.Name, node)
+	if err != nil {
+		return devicePath, err
+	}
+
+	if stat {
+		if _, err := os.Lstat(devicePath); err != nil {
+			return "", fmt.Errorf("Couldn't stat %s: %v", devicePath, err)
+		}
+	}
+
+	return devicePath, nil
+}
+
+func getDevPath(list resList, resName, node string) (string, error) {
 	// Traverse all the volume states to find volume 0 of our resource.
 	// Assume volume 0 is the one we want.
 	var devicePath string
 	for _, res := range list[0].Resources {
-		if r.Name == res.Name {
+		if resName == res.Name && node == res.NodeName {
 			for _, v := range res.Vlms {
 				if v.VlmNr == 0 {
 					devicePath = v.DevicePath
@@ -752,13 +784,7 @@ func GetDevPath(r ResourceDeployment, stat bool) (string, error) {
 
 	if devicePath == "" {
 		return devicePath, fmt.Errorf(
-			"unable to find the device path volume zero of %s in %+v", r.Name, list)
-	}
-
-	if stat {
-		if _, err := os.Lstat(devicePath); err != nil {
-			return "", fmt.Errorf("Couldn't stat %s: %v", devicePath, err)
-		}
+			"unable to find the device path volume zero of %s in %+v", resName, list)
 	}
 
 	return devicePath, nil
