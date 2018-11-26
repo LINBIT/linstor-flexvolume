@@ -258,6 +258,7 @@ func (s returnStatuses) validate() error {
 
 func linstorSuccess(retcode uint64) bool {
 	const maskError = 0xC000000000000000 // includes warnings and info (i.e., everything != SUCCESS)
+
 	return (retcode & maskError) == 0
 }
 
@@ -404,13 +405,18 @@ func (r ResourceDeployment) deployToList(list []string, asClients bool) error {
 			return fmt.Errorf("unable to assign resource %s failed to check if it was already present on node %s: %v", r.Name, node, err)
 		}
 
-		pool := r.StoragePool
-		if asClients {
-			pool = r.DisklessStoragePool
-		}
+		args := []string{"resource", "create", node, r.Name, "-s"}
 
 		if !present {
-			if err = r.linstor("resource", "create", node, r.Name, "-s", pool); err != nil {
+			if asClients {
+				// If you're assigning to a diskless storage pool, you'll get warned that
+				// your resource will be... diskless, unless you pass a flag that says
+				// that it's... diskless
+				args = append(args, r.DisklessStoragePool, "--diskless")
+			} else {
+				args = append(args, r.StoragePool)
+			}
+			if err = r.linstor(args...); err != nil {
 				return err
 			}
 		}
@@ -496,21 +502,21 @@ func (r ResourceDeployment) IsClient(nodeName string) bool {
 }
 
 func (r ResourceDeployment) doIsClient(list resList, nodeName string) bool {
-	// Traverse all the volume states to find volume 0 of our resource on nodeName.
-	// Assume volume 0 is the one we want.
-	for _, res := range list[0].ResourceStates {
-		if r.Name == res.RscName && nodeName == res.NodeName {
-			for _, v := range res.VlmStates {
-				if v.VlmNr == 0 {
-					if v.DiskState == "Diskless" {
-						return true
-					}
-					return false
-				}
-			}
+	// Traverse all resources to find our resource on nodeName.
+	for _, res := range list[0].Resources {
+		if r.Name == res.Name && nodeName == res.NodeName && contains(res.RscFlags, "DISKLESS") {
+			return true
 		}
 	}
+	return false
+}
 
+func contains(data []string, candidate string) bool {
+	for _, e := range data {
+		if candidate == e {
+			return true
+		}
+	}
 	return false
 }
 
