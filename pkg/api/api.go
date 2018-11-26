@@ -152,37 +152,66 @@ func init() {
 	logOutput = out
 }
 
-type FlexVolumeApi struct{}
+type FlexVolumeApi struct {
+	action string
+}
 
-func (api FlexVolumeApi) Call(s []string) (string, int) {
-	if len(s) < 1 {
+func (api FlexVolumeApi) fmtAPIError(err error) (string, int) {
+	res, _ := json.Marshal(response{
+		Status:  "Failure",
+		Message: flexAPIErr{fmt.Sprintf("%s: %v", api.action, err)}.Error(),
+	})
+	return string(res), EXITBADAPICALL
+}
+
+func (api *FlexVolumeApi) Call(args []string) (string, int) {
+	if len(args) < 1 {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
 			Message: flexAPIErr{"No driver action! Valid actions are: init, attach, detach, mountdevice, unmountdevice, isattached"}.Error(),
 		})
 		return string(res), EXITBADAPICALL
 	}
-	switch s[0] {
+	api.action = args[0]
+	switch api.action {
 	case "init":
 		return api.init()
 	case "attach":
-		return api.attach(s)
+		if len(args) < 3 {
+			return tooFewArgsResponse(args)
+		}
+		return api.attach(args[1], args[2])
 	case "waitforattach":
-		return api.waitForAttach(s)
+		return api.waitForAttach()
 	case "detach":
-		return api.detach(s)
+		if len(args) < 3 {
+			return tooFewArgsResponse(args)
+		}
+		return api.detach(args[1], args[2])
 	case "mountdevice":
-		return api.mountDevice(s)
+		if len(args) < 4 {
+			return tooFewArgsResponse(args)
+		}
+		return api.mountDevice(args[1], args[3])
 	case "unmountdevice":
-		return api.unmountDevice(s)
+		if len(args) < 2 {
+			return tooFewArgsResponse(args)
+		}
+		return api.unmountDevice(args[1])
 	case "unmount":
-		return api.unmount(s)
+		if len(args) < 2 {
+			return tooFewArgsResponse(args)
+		}
+		return api.unmount(args[1])
 	case "isattached":
-		return api.isAttached(s)
+		if len(args) < 3 {
+			return tooFewArgsResponse(args)
+		}
+		return api.isAttached(args[1], args[2])
 	default:
 		res, _ := json.Marshal(response{
 			Status:  "Not supported",
-			Message: flexAPIErr{fmt.Sprintf("Unsupported driver action: %s", s[0])}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("Unsupported driver action: %s", api.action)}.Error(),
 		})
 		return string(res), EXITBADAPICALL
 	}
@@ -193,23 +222,15 @@ func (api FlexVolumeApi) init() (string, int) {
 	return string(res), EXITSUCCESS
 }
 
-func (api FlexVolumeApi) attach(s []string) (string, int) {
-	if len(s) < 3 {
-		return tooFewArgsResponse(s)
-	}
-
-	opts, err := parseOptions(s[1])
+func (api FlexVolumeApi) attach(rawOpts, node string) (string, int) {
+	opts, err := parseOptions(rawOpts)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITBADAPICALL
+		return api.fmtAPIError(err)
 	}
 
 	resource := linstor.NewResourceDeployment(linstor.ResourceDeploymentConfig{
 		Name:                opts.getResource(),
-		ClientList:          []string{s[2]},
+		ClientList:          []string{node},
 		DisklessStoragePool: opts.DisklessStoragePool,
 		LogOut:              logOutput,
 	})
@@ -217,19 +238,18 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	err = resource.Assign()
 	if err != nil {
 		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: failed to assign resource %s: %v", s[0], resource.Name, err)}.Error(),
+			Status: "Failure",
+			Message: flexAPIErr{fmt.Sprintf(
+				"%s: failed to assign resource %s: %v", api.action, resource.Name, err)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
 
-	// Only one resource is attached at a time: it's safe to assume the zeroth
-	// element is node that we want.
-	path, err := resource.GetDevPath(resource.ClientList[0], false)
+	path, err := resource.GetDevPath(node, false)
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: unable to find device path for resource %s: %v", s[0], resource.Name, err)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("%s: unable to find device path for resource %s: %v", api.action, resource.Name, err)}.Error(),
 		})
 		return string(res), EXITDRBDFAILURE
 	}
@@ -243,53 +263,38 @@ func (api FlexVolumeApi) attach(s []string) (string, int) {
 	return string(res), EXITSUCCESS
 }
 
-func (api FlexVolumeApi) waitForAttach(s []string) (string, int) {
+func (api FlexVolumeApi) waitForAttach() (string, int) {
 	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), EXITSUCCESS
 }
 
-func (api FlexVolumeApi) detach(s []string) (string, int) {
-	if len(s) < 3 {
-		return tooFewArgsResponse(s)
-	}
+func (api FlexVolumeApi) detach(name, node string) (string, int) {
 
 	resource := linstor.NewResourceDeployment(
 		linstor.ResourceDeploymentConfig{
-			Name:   s[1],
+			Name:   name,
 			LogOut: logOutput,
 		})
 
 	// Do not unassign resources that have local storage.
-	if !resource.IsClient(s[2]) {
+	if !resource.IsClient(node) {
 		res, _ := json.Marshal(response{Status: "Success"})
 		return string(res), EXITSUCCESS
 	}
 
-	err := resource.Unassign(s[2])
+	err := resource.Unassign(node)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
+		api.fmtAPIError(err)
 	}
 
 	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), EXITSUCCESS
 }
 
-func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
-	if len(s) < 4 {
-		return tooFewArgsResponse(s)
-	}
-
-	opts, err := parseOptions(s[3])
+func (api FlexVolumeApi) mountDevice(path, rawOpts string) (string, int) {
+	opts, err := parseOptions(rawOpts)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITBADAPICALL
+		return api.fmtAPIError(err)
 	}
 	r := linstor.NewResourceDeployment(
 		linstor.ResourceDeploymentConfig{Name: opts.getResource(),
@@ -311,58 +316,39 @@ func (api FlexVolumeApi) mountDevice(s []string) (string, int) {
 
 	localNode, err := os.Hostname()
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
+		return api.fmtAPIError(err)
 	}
 
-	err = mounter.Mount(s[1], localNode)
+	err = mounter.Mount(path, localNode)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
+		return api.fmtAPIError(err)
 	}
 
 	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), EXITSUCCESS
 }
 
-func (api FlexVolumeApi) unmountDevice(s []string) (string, int) {
-	return api.unmount(s)
+func (api FlexVolumeApi) unmountDevice(path string) (string, int) {
+	return api.unmount(path)
 }
 
-func (api FlexVolumeApi) unmount(s []string) (string, int) {
-	if len(s) < 2 {
-		return tooFewArgsResponse(s)
-	}
+func (api FlexVolumeApi) unmount(path string) (string, int) {
 	umounter := linstor.FSUtil{}
 
-	err := umounter.UnMount(s[1])
+	err := umounter.UnMount(path)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
+		return api.fmtAPIError(err)
 	}
 	res, _ := json.Marshal(response{Status: "Success"})
 	return string(res), EXITSUCCESS
 }
 
 func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
-	if len(s) < 2 {
-		return tooFewArgsResponse(s)
-	}
-
 	opts, err := parseOptions(s[1])
 	if err != nil {
 		res, _ := json.Marshal(response{
 			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
+			Message: flexAPIErr{fmt.Sprintf("%s: %v", api.action, err)}.Error(),
 		})
 		return string(res), EXITBADAPICALL
 	}
@@ -376,18 +362,10 @@ func (api FlexVolumeApi) getVolumeName(s []string) (string, int) {
 	return string(res), EXITSUCCESS
 }
 
-func (api FlexVolumeApi) isAttached(s []string) (string, int) {
-	if len(s) < 3 {
-		return tooFewArgsResponse(s)
-	}
-
-	opts, err := parseOptions(s[1])
+func (api FlexVolumeApi) isAttached(rawOpts, node string) (string, int) {
+	opts, err := parseOptions(rawOpts)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITBADAPICALL
+		return api.fmtAPIError(err)
 	}
 
 	resource := linstor.NewResourceDeployment(
@@ -395,13 +373,9 @@ func (api FlexVolumeApi) isAttached(s []string) (string, int) {
 			LogOut: logOutput,
 		})
 
-	ok, err := resource.OnNode(s[2])
+	ok, err := resource.OnNode(node)
 	if err != nil {
-		res, _ := json.Marshal(response{
-			Status:  "Failure",
-			Message: flexAPIErr{fmt.Sprintf("%s: %v", s[0], err)}.Error(),
-		})
-		return string(res), EXITDRBDFAILURE
+		return api.fmtAPIError(err)
 	}
 
 	if !ok {
