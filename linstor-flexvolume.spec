@@ -1,5 +1,5 @@
 Name: linstor-flexvolume
-Version: 0.7.4
+Version: 0.7.6
 Release: 1%{?dist}
 Summary: LINSTOR flexvolume plugin
 License: GPLv2+
@@ -50,9 +50,12 @@ Openshift manages the lifecycle of containerized applications and has a GUI
 %{OPENSHIFTPATH}/%{name}
 
 %changelog
+* Mon Nov 26 2018 Hayley Swimelar <hayley@linbit.com> 0.7.6-1
+-  Update golinstor to 0.10.0
+-  Code cleaning
+
 * Fri Sep 18 2018 Hayley Swimelar <hayley@linbit.com> 0.7.4-1
 -  New upstream release
 
-%changelog
 * Tue Jul 31 2018 Roland Kammerer <roland.kammerer@linbit.com> 0.7.3-1
 -  New upstream release

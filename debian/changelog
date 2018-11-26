@@ -1,3 +1,10 @@
+linstor-flexvolume (0.7.6-1) unstable; urgency=medium
+
+  * Update golinstor to 0.10.0
+  * Code cleaning
+
+ -- Hayley Swimelar <hayley@hayley@linbit.com>  Mon, 26 Nov 2018 15:46:44 -0800
+
 linstor-flexvolume (0.7.4-1) unstable; urgency=medium
 
   * New upsteam version
