@@ -1,3 +1,5 @@
+# THIS PROJECT IS DEPRECATED, PLEASE USE OUR [CSI PLUGIN](https://github.com/LINBIT/linstor-csi)</br></br></br></br></br></br></br></br></br></br></br></br></br></br></br>
+
 # Linstor flexvolume plugin for Kubernetes
 
 ## Building
