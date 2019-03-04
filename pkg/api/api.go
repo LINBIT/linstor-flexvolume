@@ -144,12 +144,17 @@ func parseOptions(s string) (options, error) {
 var logOutput io.Writer
 
 func init() {
-	out, err := syslog.New(syslog.LOG_INFO, "Linstor FlexVolume")
-	if err != nil {
-		log.Fatal(err)
+	syslogOut, err := syslog.New(syslog.LOG_INFO, "Linstor FlexVolume")
+	if err == nil {
+		logOutput = syslogOut
+	} else {
+		fileOut, errF := os.OpenFile("/tmp/linstor_flex", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+		if errF != nil {
+			log.Fatal(errF)
+		}
+		defer fileOut.Close()
+		logOutput = fileOut
 	}
-
-	logOutput = out
 }
 
 type FlexVolumeApi struct {
